@@ -3,9 +3,12 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const connectDB = require('./Db/configdb');
 const otpRoutes = require('./Routes/otpRouter');
 const { uploadsDir } = require('./config/uploads');
+const User = require('./Models/User');
+const Conversation = require('./Models/Conversation');
 
 connectDB();
 
@@ -35,6 +38,30 @@ const io = new Server(server, {
   },
 });
 
+const isConversationParticipant = (conversation, userId) =>
+  conversation.customer.toString() === userId.toString() ||
+  conversation.vendor.toString() === userId.toString();
+
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+      return next(new Error('Authentication required'));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+    if (!user) {
+      return next(new Error('Authentication required'));
+    }
+
+    socket.user = user;
+    return next();
+  } catch (error) {
+    return next(new Error('Authentication required'));
+  }
+});
+
 app.use(cors({
   origin: corsOrigin,
   credentials: true,
@@ -52,6 +79,8 @@ app.use('/api/auth', require('./Routes/authRoutes'));
 app.use('/api/products', require('./Routes/productRouter'));
 app.use('/api/chat', require('./Routes/chatRoutes'));
 app.use('/api/vendors', require('./Routes/vendorRoutes'));
+app.use('/api/reports', require('./Routes/reportRoutes'));
+app.use('/api/blocks', require('./Routes/blockRoutes'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));
 
@@ -60,25 +89,49 @@ const connectedUsers = new Map();
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
-  socket.on('user-online', (userId) => {
+  socket.on('user-online', () => {
+    const userId = socket.user._id.toString();
     connectedUsers.set(userId, socket.id);
     console.log(`User ${userId} online`);
   });
 
-  socket.on('join-conversation', (conversationId) => {
-    socket.join(conversationId);
+  socket.on('join-conversation', async (conversationId) => {
+    try {
+      const conversation = await Conversation.findById(conversationId).select('customer vendor');
+      if (!conversation || !isConversationParticipant(conversation, socket.user._id)) {
+        socket.emit('error-message', { message: 'Not authorized for this conversation.' });
+        return;
+      }
+
+      socket.join(conversationId);
+    } catch (error) {
+      socket.emit('error-message', { message: 'Failed to join conversation.' });
+    }
   });
 
-  socket.on('send-message', (data) => {
-    io.to(data.conversationId).emit('receive-message', data);
+  socket.on('send-message', async (data) => {
+    try {
+      const conversationId = data?.conversationId;
+      if (!conversationId) return;
+
+      const conversation = await Conversation.findById(conversationId).select('customer vendor');
+      if (!conversation || !isConversationParticipant(conversation, socket.user._id)) {
+        socket.emit('error-message', { message: 'Not authorized for this conversation.' });
+        return;
+      }
+
+      io.to(conversationId).emit('receive-message', data);
+    } catch (error) {
+      socket.emit('error-message', { message: 'Failed to send real-time message.' });
+    }
   });
 
   socket.on('typing', (data) => {
-    socket.to(data.conversationId).emit('user-typing', { userId: data.userId });
+    socket.to(data.conversationId).emit('user-typing', { userId: socket.user._id });
   });
 
   socket.on('stop-typing', (data) => {
-    socket.to(data.conversationId).emit('user-stop-typing', { userId: data.userId });
+    socket.to(data.conversationId).emit('user-stop-typing', { userId: socket.user._id });
   });
 
   socket.on('disconnect', () => {
@@ -90,4 +143,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));

@@ -12,6 +12,13 @@ const { uploadsDir } = require('../config/uploads');
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
 
+const sanitizeUser = (user) => {
+  if (!user) return user;
+  const obj = user.toObject ? user.toObject() : { ...user };
+  delete obj.password;
+  return obj;
+};
+
 const deleteUploadedFile = async (fileName) => {
   if (!fileName || /^https?:\/\//i.test(fileName)) return;
 
@@ -72,7 +79,7 @@ exports.registerCustomer = async (req, res) => {
     res.status(201).json({
       success: true,
       token: generateToken(user._id),
-      user,
+      user: sanitizeUser(user),
     });
   } catch (error) {
     res.status(500).json({
@@ -158,7 +165,7 @@ exports.registerVendor = async (req, res) => {
     res.status(201).json({
       success: true,
       token: generateToken(user._id),
-      user,
+      user: sanitizeUser(user),
       vendor,
     });
   } catch (error) {
@@ -196,7 +203,7 @@ exports.login = async (req, res) => {
     res.json({
       success: true,
       token: generateToken(user._id),
-      user,
+      user: sanitizeUser(user),
       vendorProfile,
     });
   } catch (error) {
@@ -216,7 +223,7 @@ exports.getMe = async (req, res) => {
 
     res.json({
       success: true,
-      user,
+      user: sanitizeUser(user),
       vendorProfile,
     });
   } catch (error) {

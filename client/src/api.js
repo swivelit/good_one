@@ -39,6 +39,14 @@ export const chatAPI = {
   sendMessage: (convId, data) => API.post(`/chat/${convId}/messages`, data),
 };
 
+export const reportAPI = {
+  create: (data) => API.post('/reports', data),
+};
+
+export const blockAPI = {
+  blockUser: (data) => API.post('/blocks', data),
+};
+
 export const vendorAPI = {
   getAll: () => API.get('/vendors'),
   getOne: (id) => API.get(`/vendors/${id}`),

@@ -1,10 +1,11 @@
 import React from "react";
+import { SUPPORT_EMAIL } from "../config";
 
 export default function PrivacyPolicy() {
   return (
     <main className="container py-5" style={{ maxWidth: 860 }}>
       <h1 className="fw-bold mb-3">Privacy Policy</h1>
-      <p className="text-muted">Last updated: April 29, 2026</p>
+      <p className="text-muted">Last updated: April 30, 2026</p>
 
       <p>
         GoodOne collects the information needed to run local marketplace accounts,
@@ -29,7 +30,7 @@ export default function PrivacyPolicy() {
 
       <h5 className="fw-bold mt-4">Contact</h5>
       <p>
-        For privacy questions, contact <a href="mailto:support@example.com">support@example.com</a>.
+        For privacy questions, contact <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
 
       <div className="alert alert-warning mt-4">

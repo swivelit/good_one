@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { authAPI } from "../api";
 import { useAuth } from "../AuthContext";
+import { SUPPORT_EMAIL } from "../config";
 
 export default function AccountDeletionPage() {
   const { user, logout } = useAuth();
@@ -58,7 +59,7 @@ export default function AccountDeletionPage() {
       ) : (
         <div className="alert alert-info">
           Please <Link to="/login">login</Link> first to delete your account, or
-          contact <a href="mailto:support@example.com">support@example.com</a>{" "}
+          contact <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>{" "}
           from the email address tied to your account.
         </div>
       )}

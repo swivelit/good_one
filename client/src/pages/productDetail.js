@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { productAPI, chatAPI } from "../api";
+import { productAPI, chatAPI, reportAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import toast from "react-hot-toast";
 import { getUploadUrl } from "../config";
@@ -66,6 +66,29 @@ export default function ProductDetail() {
       toast.error("Failed to start conversation");
     } finally {
       setChatLoading(false);
+    }
+  };
+
+  const handleReportListing = async () => {
+    if (!user) {
+      toast.error("Please login to report this listing");
+      return navigate("/login");
+    }
+
+    const reason = prompt("Why are you reporting this listing?");
+    if (!reason?.trim()) return;
+    const details = prompt("Add any extra details (optional):") || "";
+
+    try {
+      await reportAPI.create({
+        product: product._id,
+        reportedUser: product.vendorUser?._id,
+        reason,
+        details,
+      });
+      toast.success("Report submitted");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to submit report");
     }
   };
 
@@ -261,6 +284,12 @@ export default function ProductDetail() {
             {user?.role === "vendor"
               ? "Chat Not Available for Vendors"
               : "Chat with Vendor"}
+          </button>
+          <button
+            className="btn btn-outline-danger btn-sm mb-3"
+            onClick={handleReportListing}
+          >
+            <i className="bi bi-flag me-1"></i>Report listing
           </button>
 
           <div className="d-flex gap-2">

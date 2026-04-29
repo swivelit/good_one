@@ -9,6 +9,9 @@ const otpSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  resendBlockedUntil: {
+    type: Date,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

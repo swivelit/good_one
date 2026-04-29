@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { chatAPI } from '../api';
+import { blockAPI, chatAPI, reportAPI } from '../api';
 import { useAuth } from '../AuthContext';
 import toast from 'react-hot-toast';
 import { io } from 'socket.io-client';
@@ -41,7 +41,10 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user?._id) return undefined;
 
-    socketRef.current = io(BACKEND_URL, { transports: ['websocket'] });
+    socketRef.current = io(BACKEND_URL, {
+      transports: ['websocket'],
+      auth: { token: localStorage.getItem('token') },
+    });
     socketRef.current.emit('user-online', user._id);
     socketRef.current.on('receive-message', (msg) => {
       setMessages(prev => [...prev, msg]);
@@ -115,6 +118,45 @@ export default function ChatPage() {
     return user.role === 'customer' ? conv.vendor : conv.customer;
   };
 
+  const handleReportConversation = async () => {
+    if (!activeConv) return;
+    const otherUser = getOtherUser(activeConv);
+    const reason = prompt('Why are you reporting this conversation?');
+    if (!reason?.trim()) return;
+    const details = prompt('Add any extra details (optional):') || '';
+
+    try {
+      await reportAPI.create({
+        conversation: activeConv._id,
+        reportedUser: otherUser?._id,
+        reason,
+        details,
+      });
+      toast.success('Report submitted');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to submit report');
+    }
+  };
+
+  const handleBlockUser = async () => {
+    if (!activeConv) return;
+    const otherUser = getOtherUser(activeConv);
+    if (!otherUser?._id) return;
+
+    const confirmed = window.confirm(`Block ${otherUser.name || 'this user'}? They will not be able to message you.`);
+    if (!confirmed) return;
+
+    try {
+      await blockAPI.blockUser({
+        blockedUser: otherUser._id,
+        conversation: activeConv._id,
+      });
+      toast.success('User blocked');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to block user');
+    }
+  };
+
   return (
     <div className="container py-3 py-md-4">
       <h5 className="fw-bold mb-3"><i className="bi bi-chat-dots me-2" style={{color:'#FF6B35'}}></i>Messages</h5>
@@ -182,7 +224,13 @@ export default function ChatPage() {
                   <div className="fw-bold">{getOtherUser(activeConv)?.name}</div>
                   <small className="text-muted">{activeConv.product?.title}</small>
                 </div>
-                <div className="ms-auto">
+                <div className="ms-auto d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                  <button className="btn btn-sm btn-outline-danger" onClick={handleReportConversation}>
+                    <i className="bi bi-flag me-1"></i>Report
+                  </button>
+                  <button className="btn btn-sm btn-outline-secondary" onClick={handleBlockUser}>
+                    <i className="bi bi-slash-circle me-1"></i>Block User
+                  </button>
                   <span className="badge" style={{background:'#FF6B35',color:'#fff'}}>
                     ₹{activeConv.product?.price?.toLocaleString()}
                   </span>

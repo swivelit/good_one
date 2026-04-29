@@ -1,6 +1,24 @@
 const Conversation = require('../Models/Conversation');
 const Message = require('../Models/Message');
 const Product = require('../Models/Product');
+const Block = require('../Models/Block');
+
+const isParticipant = (conversation, userId) =>
+  conversation.customer.toString() === userId.toString() ||
+  conversation.vendor.toString() === userId.toString();
+
+const getOtherParticipantId = (conversation, userId) =>
+  conversation.customer.toString() === userId.toString()
+    ? conversation.vendor
+    : conversation.customer;
+
+const findBlockBetween = (userId, otherUserId) =>
+  Block.findOne({
+    $or: [
+      { blocker: userId, blockedUser: otherUserId },
+      { blocker: otherUserId, blockedUser: userId },
+    ],
+  });
 
 // @desc  Get or create conversation
 // @route POST /api/chat/conversation
@@ -9,6 +27,11 @@ exports.getOrCreateConversation = async (req, res) => {
     const { productId } = req.body;
     const product = await Product.findById(productId);
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
+
+    const block = await findBlockBetween(req.user._id, product.vendorUser);
+    if (block) {
+      return res.status(403).json({ success: false, message: 'Chat is not available between these users.' });
+    }
 
     let conv = await Conversation.findOne({
       product: productId,
@@ -79,17 +102,30 @@ exports.getMessages = async (req, res) => {
 exports.sendMessage = async (req, res) => {
   try {
     const { text, type, offerPrice, meetupDetails } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'Message text is required.' });
+    }
+
     const conv = await Conversation.findById(req.params.conversationId);
     if (!conv) return res.status(404).json({ success: false, message: 'Conversation not found.' });
+    if (!isParticipant(conv, req.user._id)) {
+      return res.status(403).json({ success: false, message: 'Not authorized.' });
+    }
+
+    const otherUserId = getOtherParticipantId(conv, req.user._id);
+    const block = await findBlockBetween(req.user._id, otherUserId);
+    if (block) {
+      return res.status(403).json({ success: false, message: 'Chat is not available between these users.' });
+    }
 
     const message = await Message.create({
       conversation: conv._id,
       sender: req.user._id,
-      text, type: type || 'text',
+      text: text.trim(), type: type || 'text',
       offerPrice, meetupDetails,
     });
 
-    conv.lastMessage = text;
+    conv.lastMessage = text.trim();
     conv.lastMessageAt = new Date();
     conv.unreadCount += 1;
     await conv.save();

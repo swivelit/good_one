@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { SUPPORT_EMAIL } from './config';
 
 export default function Footer() {
   return (
@@ -32,7 +33,7 @@ export default function Footer() {
             <ul className="list-unstyled small">
               <li className="mb-2"><a href="/#" className=" text-decoration-none">Help Center</a></li>
               <li className="mb-2"><a href="/#" className="text-decoration-none">Safety Tips</a></li>
-              <li className="mb-2"><a href="mailto:support@example.com" className=" text-decoration-none">Contact Support</a></li>
+              <li className="mb-2"><a href={`mailto:${SUPPORT_EMAIL}`} className=" text-decoration-none">Contact Support</a></li>
               <li className="mb-2"><Link to="/privacy" className=" text-decoration-none">Privacy Policy</Link></li>
               <li className="mb-2"><Link to="/account-deletion" className=" text-decoration-none">Delete Account</Link></li>
             </ul>
