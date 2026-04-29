@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { getUploadUrl } from './config';
 
 function getTimeLeft(expiresAt) {
   const now = new Date();
@@ -23,7 +24,7 @@ const timer = getTimeLeft(product.expiresAt);
   
 
 const imgSrc = product?.images?.[0]
-  ? `http://localhost:5000/uploads/${product.images[0]}`
+  ? getUploadUrl(product.images[0])
   : PLACEHOLDER;
 
   return (

@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { productAPI, chatAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import toast from "react-hot-toast";
+import { getUploadUrl } from "../config";
 
 function getTimeLeft(expiresAt) {
   const diff = new Date(expiresAt) - new Date();
@@ -92,7 +93,7 @@ export default function ProductDetail() {
   const timer = getTimeLeft(product.expiresAt);
 
   const imgs = product?.images?.length
-    ? product.images.map((i) => `http://localhost:5000/uploads/${i}`)
+    ? product.images.map((i) => getUploadUrl(i))
     : [PLACEHOLDER];
 
   console.log("Product images:", product.images);

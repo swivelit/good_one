@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { vendorAPI, chatAPI } from '../api';
-import { useAuth } from '../AuthContext';
+import { useParams } from 'react-router-dom';
+import { vendorAPI } from '../api';
 import ProductCard from '../productCard';
 import toast from 'react-hot-toast';
 
@@ -10,7 +9,6 @@ export default function VendorProfile() {
   const [vendor, setVendor] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
 
   useEffect(() => {
     vendorAPI.getOne(id)

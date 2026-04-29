@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { chatAPI } from '../api';
 import { useAuth } from '../AuthContext';
 import toast from 'react-hot-toast';
 import { io } from 'socket.io-client';
-
-const PLACEHOLDER = 'https://via.placeholder.com/40x40/FF6B35/ffffff?text=?';
+import { BACKEND_URL } from '../config';
 
 export default function ChatPage() {
   const { conversationId } = useParams();
@@ -21,42 +20,15 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
-  useEffect(() => {
-    // Init socket
-    socketRef.current = io('/', { transports: ['websocket'] });
-    socketRef.current.emit('user-online', user._id);
-    socketRef.current.on('receive-message', (msg) => {
-      setMessages(prev => [...prev, msg]);
-    });
-    socketRef.current.on('user-typing', () => setIsTyping(true));
-    socketRef.current.on('user-stop-typing', () => setIsTyping(false));
-    return () => socketRef.current?.disconnect();
-  }, []);
-
-  useEffect(() => {
-    fetchConversations();
-  }, []);
-
-  useEffect(() => {
-    if (conversationId) {
-      const found = conversations.find(c => c._id === conversationId);
-      if (found) openConversation(found);
-    }
-  }, [conversationId, conversations]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const fetchConversations = async () => {
+  const fetchConversations = useCallback(async () => {
     try {
       const { data } = await chatAPI.getConversations();
       setConversations(data.conversations);
     } catch { toast.error('Failed to load conversations'); }
     finally { setLoading(false); }
-  };
+  }, []);
 
-  const openConversation = async (conv) => {
+  const openConversation = useCallback(async (conv) => {
     setActiveConv(conv);
     navigate(`/chat/${conv._id}`, { replace: true });
     socketRef.current?.emit('join-conversation', conv._id);
@@ -64,7 +36,35 @@ export default function ChatPage() {
       const { data } = await chatAPI.getMessages(conv._id);
       setMessages(data.messages);
     } catch { toast.error('Failed to load messages'); }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!user?._id) return undefined;
+
+    socketRef.current = io(BACKEND_URL, { transports: ['websocket'] });
+    socketRef.current.emit('user-online', user._id);
+    socketRef.current.on('receive-message', (msg) => {
+      setMessages(prev => [...prev, msg]);
+    });
+    socketRef.current.on('user-typing', () => setIsTyping(true));
+    socketRef.current.on('user-stop-typing', () => setIsTyping(false));
+    return () => socketRef.current?.disconnect();
+  }, [user?._id]);
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
+  useEffect(() => {
+    if (conversationId) {
+      const found = conversations.find(c => c._id === conversationId);
+      if (found) openConversation(found);
+    }
+  }, [conversationId, conversations, openConversation]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleSend = async (e) => {
     e.preventDefault();

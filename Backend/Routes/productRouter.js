@@ -6,10 +6,19 @@ const {
 } = require('../Controllers/productController');
 const { protect, vendorOnly } = require('../middleware/auth');
 const multer = require('multer');
+const path = require('path');
+const { uploadsDir } = require('../config/uploads');
+
+const sanitizeFileName = (fileName) => {
+  const safeName = path.basename(fileName || 'upload')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9._-]/g, '');
+  return safeName || 'upload';
+};
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${sanitizeFileName(file.originalname)}`),
 });
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 

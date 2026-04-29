@@ -14,6 +14,8 @@ import VendorDashboard from './pages/VendorDashboard';
 import VendorProfile from './pages/VendorProfile';
 import AddProduct from './pages/addProduct';
 import NotFound from './pages/NotFoundPage';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import AccountDeletionPage from './pages/AccountDeletionPage';
 
 
 
@@ -36,6 +38,8 @@ function AppRoutes() {
         <Route path="/register/vendor" element={<RegisterVendor />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/vendors/:id" element={<VendorProfile />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/account-deletion" element={<AccountDeletionPage />} />
         <Route path="/chat" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
         <Route path="/chat/:conversationId" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
         <Route path="/dashboard" element={<PrivateRoute role="vendor"><VendorDashboard /></PrivateRoute>} />

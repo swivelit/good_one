@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { productAPI } from "../api";
 import ProductCard from "../productCard";
 import toast from "react-hot-toast";
 import "../App.css";
 import CountUp from "react-countup";
+import { getUploadUrl } from "../config";
 
 const CATEGORIES = [
   "All",
@@ -32,11 +33,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const search = searchParams.get("search") || "";
 
-  useEffect(() => {
-    fetchProducts();
-  }, [category, page, search]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -57,13 +54,17 @@ export default function HomePage() {
 
       toast.error("Failed to load products, showing demo data");
 
-      setProducts();
+      setProducts([]);
       setPages(1);
-      setTotal();
+      setTotal(0);
     } finally {
       setLoading(false);
     }
-  };
+  }, [category, page, search]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   return (
     <>
@@ -148,7 +149,7 @@ export default function HomePage() {
                       className="d-flex align-items-center mb-3 border-bottom pb-2"
                     >
                       <img
-                        src={`http://localhost:5000/uploads/${p.images?.[0]}`}
+                        src={getUploadUrl(p.images?.[0])}
                         alt={p.title}
                         style={{
                           width: 50,

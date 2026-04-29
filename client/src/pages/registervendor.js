@@ -521,7 +521,7 @@ export default function RegisterVendor() {
                 <div className="text-center mb-3">
                   <img
                     src={capturedPhoto}
-                    alt="Live Photo"
+                    alt="Captured verification"
                     className="rounded-3 img-fluid mb-2"
                     style={{ maxHeight: 220, border: "3px solid #FF6B35" }}
                   />

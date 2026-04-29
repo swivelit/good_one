@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GoodOne</string>
+    <string name="title_activity_main">GoodOne</string>
+    <string name="package_name">com.goodone.marketplace</string>
+    <string name="custom_url_scheme">com.goodone.marketplace</string>
+</resources>

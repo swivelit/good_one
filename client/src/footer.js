@@ -32,7 +32,9 @@ export default function Footer() {
             <ul className="list-unstyled small">
               <li className="mb-2"><a href="/#" className=" text-decoration-none">Help Center</a></li>
               <li className="mb-2"><a href="/#" className="text-decoration-none">Safety Tips</a></li>
-              <li className="mb-2"><a href="/#" className=" text-decoration-none">Contact Us</a></li>
+              <li className="mb-2"><a href="mailto:support@example.com" className=" text-decoration-none">Contact Support</a></li>
+              <li className="mb-2"><Link to="/privacy" className=" text-decoration-none">Privacy Policy</Link></li>
+              <li className="mb-2"><Link to="/account-deletion" className=" text-decoration-none">Delete Account</Link></li>
             </ul>
           </div>
           <div className="col-lg-4 col-md-6">

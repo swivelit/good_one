@@ -1,0 +1,6 @@
+{
+  "appId": "com.goodone.marketplace",
+  "appName": "GoodOne",
+  "webDir": "build",
+  "bundledWebRuntime": false
+}

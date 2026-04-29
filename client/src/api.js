@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { API_URL } from './config';
 
 const API = axios.create({ 
-  baseURL: 'http://localhost:5000/api'
+  baseURL: API_URL
 });
 
 API.interceptors.request.use((config) => {
@@ -17,6 +18,7 @@ export const authAPI = {
   registerVendor: (data) => API.post('/auth/register/vendor', data),
   login: (data) => API.post('/auth/login', data),
   getMe: () => API.get('/auth/me'),
+  deleteMe: () => API.delete('/auth/me'),
 };
 
 export const productAPI = {

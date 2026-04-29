@@ -3,72 +3,62 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
 const connectDB = require('./Db/configdb');
-const otpRoutes = require("./Routes/otpRouter");
+const otpRoutes = require('./Routes/otpRouter');
+const { uploadsDir } = require('./config/uploads');
 
-
-
-
-// Connect to MongoDB
 connectDB();
 
 const app = express();
 const server = http.createServer(app);
 
+const defaultOrigins = ['http://localhost:3000', 'http://localhost:3001'];
+const envOrigins = (process.env.CLIENT_URLS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
+
+const corsOrigin = (origin, callback) => {
+  if (!origin || allowedOrigins.includes(origin)) {
+    return callback(null, true);
+  }
+
+  return callback(new Error('Not allowed by CORS'));
+};
 
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    origin: corsOrigin,
     methods: ['GET', 'POST'],
-    credentials: true
-  }
+    credentials: true,
+  },
 });
 
-
-
-// Create uploads directory
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-// Middleware
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001'
-];
-
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
+  origin: corsOrigin,
+  credentials: true,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.join(__dirname, './uploads')));
+app.use('/uploads', express.static(uploadsDir));
 
-// Routes
+app.get('/', (req, res) => {
+  res.json({ success: true, message: 'GoodOne API is running' });
+});
 
-app.use("/api", otpRoutes);
+app.use('/api', otpRoutes);
 app.use('/api/auth', require('./Routes/authRoutes'));
 app.use('/api/products', require('./Routes/productRouter'));
 app.use('/api/chat', require('./Routes/chatRoutes'));
 app.use('/api/vendors', require('./Routes/vendorRoutes'));
 
-
-// Health check
 app.get('/api/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));
 
-// Socket.IO for real-time chat
 const connectedUsers = new Map();
 
 io.on('connection', (socket) => {
-  console.log(`🔌 Socket connected: ${socket.id}`);
+  console.log(`Socket connected: ${socket.id}`);
 
   socket.on('user-online', (userId) => {
     connectedUsers.set(userId, socket.id);
@@ -95,9 +85,9 @@ io.on('connection', (socket) => {
     connectedUsers.forEach((socketId, userId) => {
       if (socketId === socket.id) connectedUsers.delete(userId);
     });
-    console.log(`🔌 Socket disconnected: ${socket.id}`);
+    console.log(`Socket disconnected: ${socket.id}`);
   });
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -2,6 +2,10 @@ const nodemailer = require("nodemailer");
 
 const mailSender = async (email, title, body) => {
   try {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      throw new Error("Email service is not configured");
+    }
+
     let transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -19,7 +23,8 @@ const mailSender = async (email, title, body) => {
 
     return info;
   } catch (error) {
-    console.log(error);
+    console.error(`Email delivery failed: ${error.message}`);
+    throw new Error(`Email delivery failed: ${error.message}`);
   }
 };
 

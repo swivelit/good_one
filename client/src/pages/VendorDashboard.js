@@ -3,6 +3,7 @@ import { Link,} from "react-router-dom";
 import { productAPI, vendorAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import toast from "react-hot-toast";
+import { getUploadUrl } from "../config";
 
 function getTimeLeft(expiresAt) {
   const diff = new Date(expiresAt) - new Date();
@@ -112,8 +113,9 @@ export default function VendorDashboard() {
           <div className="d-flex align-items-center gap-2 mb-3">
             {vendorProfile?.livePhoto ? (
               <img
-                src={`http://localhost:5000/uploads/${vendorProfile.livePhoto}`}
+                src={getUploadUrl(vendorProfile.livePhoto)}
                 className="rounded-circle"
+                alt={vendorProfile.businessName || "Vendor profile"}
                 style={{ width: 42, height: 42, objectFit: "cover" }}
               />
             ) : (
