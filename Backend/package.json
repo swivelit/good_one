@@ -11,6 +11,7 @@
     "dev": "node index.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
+    "test:live": "node scripts/live-e2e-test.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {
