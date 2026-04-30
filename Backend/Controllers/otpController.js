@@ -1,73 +1,71 @@
-const otpGenerator = require("otp-generator");
-const OTP = require("../Models/otp");
-const User = require("../Models/User");
-const mailSender = require("../utills/sendMail");
+const otpGenerator = require('otp-generator');
+const prisma = require('../Db/prisma');
+const mailSender = require('../utills/sendMail');
 
-exports.sendOtp = async (req, res) => {
-  try {
-    const { email } = req.body;
+const OTP_EXPIRY_MS = 5 * 60 * 1000;
 
-    // Check user already exists
-    const existingUser = await User.findOne({ email });
+const generateOtp = () =>
+  otpGenerator.generate(6, {
+    upperCaseAlphabets: false,
+    lowerCaseAlphabets: false,
+    specialChars: false,
+  });
 
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: "User already registered",
-      });
-    }
-
-    // Generate OTP
-    const otp = otpGenerator.generate(6, {
-      upperCaseAlphabets: false,
-      lowerCaseAlphabets: false,
-      specialChars: false,
-    });
-
-    // Delete old OTPs
-    await OTP.deleteMany({ email });
-
-    // Save OTP
-    await OTP.create({ email, otp });
-
-    // Send email
-   await mailSender(
-  email,
-  "Your OTP Code - Good_one",
-  `
+const otpEmailBody = (otp) => `
   <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    
     <h2 style="color: #2c3e50;">Good_one Verification</h2>
-
     <p>Hello,</p>
-
     <p>Thank you for choosing <strong>Good_one</strong>. To proceed with your request, please use the One-Time Password (OTP) below:</p>
-
     <div style="margin: 20px 0; text-align: center;">
       <span style="font-size: 24px; font-weight: bold; color: #ffffff; background: #007bff; padding: 10px 20px; border-radius: 5px;">
         ${otp}
       </span>
     </div>
-
     <p>This OTP is valid for <strong>5 minutes</strong>. Please do not share it with anyone for security reasons.</p>
-
     <p>If you did not request this, please ignore this email.</p>
-
     <br/>
-
     <p>Regards,</p>
     <p><strong>Good_one Team</strong></p>
-
   </div>
-  `
-);
+`;
 
+const deleteExpiredOtps = () =>
+  prisma.otp.deleteMany({
+    where: {
+      createdAt: { lt: new Date(Date.now() - OTP_EXPIRY_MS) },
+    },
+  });
+
+exports.sendOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const normalizedEmail = email?.toLowerCase().trim();
+
+    if (!normalizedEmail) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User already registered',
+      });
+    }
+
+    const otp = generateOtp();
+
+    await deleteExpiredOtps();
+    await prisma.otp.deleteMany({ where: { email: normalizedEmail } });
+    await prisma.otp.create({ data: { email: normalizedEmail, otp } });
+
+    await mailSender(normalizedEmail, 'Your OTP Code - Good_one', otpEmailBody(otp));
 
     res.status(200).json({
       success: true,
-      message: "OTP sent successfully",
+      message: 'OTP sent successfully',
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -76,16 +74,22 @@ exports.sendOtp = async (req, res) => {
   }
 };
 
-
-
-
 exports.resendOtp = async (req, res) => {
   try {
     const { email } = req.body;
+    const normalizedEmail = email?.toLowerCase().trim();
 
-    const existingOtp = await OTP.findOne({ email }).sort({ createdAt: -1 });
+    if (!normalizedEmail) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
 
-    // ⏱️ Check cooldown
+    await deleteExpiredOtps();
+
+    const existingOtp = await prisma.otp.findFirst({
+      where: { email: normalizedEmail },
+      orderBy: { createdAt: 'desc' },
+    });
+
     if (
       existingOtp &&
       existingOtp.resendBlockedUntil &&
@@ -101,64 +105,24 @@ exports.resendOtp = async (req, res) => {
       });
     }
 
-    // 🔁 Generate new OTP
-    const otp = otpGenerator.generate(6, {
-      upperCaseAlphabets: false,
-      lowerCaseAlphabets: false,
-      specialChars: false,
-    });
-
-    // 🗑️ Delete old OTP
-    await OTP.deleteMany({ email });
-
-    // ⏱️ Set cooldown (30 seconds)
+    const otp = generateOtp();
     const resendBlockedUntil = new Date(Date.now() + 30 * 1000);
 
-    // 💾 Save new OTP
-    await OTP.create({
-      email,
-      otp,
-      resendBlockedUntil,
+    await prisma.otp.deleteMany({ where: { email: normalizedEmail } });
+    await prisma.otp.create({
+      data: {
+        email: normalizedEmail,
+        otp,
+        resendBlockedUntil,
+      },
     });
 
-    // 📩 Send email
-    await mailSender(
-  email,
-  "Your OTP Code - Good_one",
-  `
-  <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    
-    <h2 style="color: #2c3e50;">Good_one Verification</h2>
-
-    <p>Hello,</p>
-
-    <p>Thank you for choosing <strong>Good_one</strong>. To proceed with your request, please use the One-Time Password (OTP) below:</p>
-
-    <div style="margin: 20px 0; text-align: center;">
-      <span style="font-size: 24px; font-weight: bold; color: #ffffff; background: #007bff; padding: 10px 20px; border-radius: 5px;">
-        ${otp}
-      </span>
-    </div>
-
-    <p>This OTP is valid for <strong>5 minutes</strong>. Please do not share it with anyone for security reasons.</p>
-
-    <p>If you did not request this, please ignore this email.</p>
-
-    <br/>
-
-    <p>Regards,</p>
-    <p><strong>Good_one Team</strong></p>
-
-  </div>
-  `
-);
-
+    await mailSender(normalizedEmail, 'Your OTP Code - Good_one', otpEmailBody(otp));
 
     res.status(200).json({
       success: true,
-      message: "OTP resent successfully",
+      message: 'OTP resent successfully',
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -166,7 +130,3 @@ exports.resendOtp = async (req, res) => {
     });
   }
 };
-
-
-
-

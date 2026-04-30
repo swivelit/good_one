@@ -1,4 +1,5 @@
-const Report = require('../Models/Report');
+const prisma = require('../Db/prisma');
+const { toCompat } = require('../utils/serialize');
 
 exports.createReport = async (req, res) => {
   try {
@@ -8,20 +9,22 @@ exports.createReport = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Report reason is required.' });
     }
 
-    const report = await Report.create({
-      reporter: req.user._id,
-      reportedUser,
-      product,
-      conversation,
-      message,
-      reason: reason.trim(),
-      details: details?.trim(),
+    const report = await prisma.report.create({
+      data: {
+        reporterId: req.user.id,
+        reportedUserId: reportedUser || null,
+        productId: product || null,
+        conversationId: conversation || null,
+        messageId: message || null,
+        reason: reason.trim(),
+        details: details?.trim() || null,
+      },
     });
 
     res.status(201).json({
       success: true,
       message: 'Report submitted successfully.',
-      report,
+      report: toCompat(report),
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

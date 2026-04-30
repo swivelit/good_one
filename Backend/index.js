@@ -4,13 +4,10 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const connectDB = require('./Db/configdb');
+const prisma = require('./Db/prisma');
 const otpRoutes = require('./Routes/otpRouter');
 const { uploadsDir } = require('./config/uploads');
-const User = require('./Models/User');
-const Conversation = require('./Models/Conversation');
-
-connectDB();
+const { sanitizeUser } = require('./utils/serialize');
 
 const app = express();
 const server = http.createServer(app);
@@ -39,8 +36,7 @@ const io = new Server(server, {
 });
 
 const isConversationParticipant = (conversation, userId) =>
-  conversation.customer.toString() === userId.toString() ||
-  conversation.vendor.toString() === userId.toString();
+  conversation.customerId === userId || conversation.vendorId === userId;
 
 io.use(async (socket, next) => {
   try {
@@ -50,12 +46,12 @@ io.use(async (socket, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
+    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) {
       return next(new Error('Authentication required'));
     }
 
-    socket.user = user;
+    socket.user = sanitizeUser(user);
     return next();
   } catch (error) {
     return next(new Error('Authentication required'));
@@ -90,15 +86,18 @@ io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
   socket.on('user-online', () => {
-    const userId = socket.user._id.toString();
+    const userId = socket.user.id;
     connectedUsers.set(userId, socket.id);
     console.log(`User ${userId} online`);
   });
 
   socket.on('join-conversation', async (conversationId) => {
     try {
-      const conversation = await Conversation.findById(conversationId).select('customer vendor');
-      if (!conversation || !isConversationParticipant(conversation, socket.user._id)) {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { customerId: true, vendorId: true },
+      });
+      if (!conversation || !isConversationParticipant(conversation, socket.user.id)) {
         socket.emit('error-message', { message: 'Not authorized for this conversation.' });
         return;
       }
@@ -114,8 +113,11 @@ io.on('connection', (socket) => {
       const conversationId = data?.conversationId;
       if (!conversationId) return;
 
-      const conversation = await Conversation.findById(conversationId).select('customer vendor');
-      if (!conversation || !isConversationParticipant(conversation, socket.user._id)) {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { customerId: true, vendorId: true },
+      });
+      if (!conversation || !isConversationParticipant(conversation, socket.user.id)) {
         socket.emit('error-message', { message: 'Not authorized for this conversation.' });
         return;
       }
@@ -127,11 +129,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('typing', (data) => {
-    socket.to(data.conversationId).emit('user-typing', { userId: socket.user._id });
+    socket.to(data.conversationId).emit('user-typing', { userId: socket.user.id });
   });
 
   socket.on('stop-typing', (data) => {
-    socket.to(data.conversationId).emit('user-stop-typing', { userId: socket.user._id });
+    socket.to(data.conversationId).emit('user-stop-typing', { userId: socket.user.id });
   });
 
   socket.on('disconnect', () => {
@@ -143,4 +145,14 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+const startServer = async () => {
+  try {
+    await prisma.$connect();
+    server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+  } catch (error) {
+    console.error('Failed to connect to Postgres:', error.message);
+    process.exit(1);
+  }
+};
+
+startServer();

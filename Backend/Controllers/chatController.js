@@ -1,104 +1,107 @@
-const Conversation = require('../Models/Conversation');
-const Message = require('../Models/Message');
-const Product = require('../Models/Product');
-const Block = require('../Models/Block');
+const prisma = require('../Db/prisma');
+const { toCompat } = require('../utils/serialize');
+
+const conversationInclude = {
+  product: { select: { id: true, title: true, images: true, price: true, expiresAt: true } },
+  vendor: { select: { id: true, name: true, avatar: true } },
+  customer: { select: { id: true, name: true, avatar: true } },
+};
 
 const isParticipant = (conversation, userId) =>
-  conversation.customer.toString() === userId.toString() ||
-  conversation.vendor.toString() === userId.toString();
+  conversation.customerId === userId || conversation.vendorId === userId;
 
 const getOtherParticipantId = (conversation, userId) =>
-  conversation.customer.toString() === userId.toString()
-    ? conversation.vendor
-    : conversation.customer;
+  conversation.customerId === userId ? conversation.vendorId : conversation.customerId;
 
 const findBlockBetween = (userId, otherUserId) =>
-  Block.findOne({
-    $or: [
-      { blocker: userId, blockedUser: otherUserId },
-      { blocker: otherUserId, blockedUser: userId },
-    ],
+  prisma.block.findFirst({
+    where: {
+      OR: [
+        { blockerId: userId, blockedUserId: otherUserId },
+        { blockerId: otherUserId, blockedUserId: userId },
+      ],
+    },
   });
 
-// @desc  Get or create conversation
-// @route POST /api/chat/conversation
 exports.getOrCreateConversation = async (req, res) => {
   try {
     const { productId } = req.body;
-    const product = await Product.findById(productId);
+    const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
 
-    const block = await findBlockBetween(req.user._id, product.vendorUser);
+    const block = await findBlockBetween(req.user.id, product.vendorUserId);
     if (block) {
       return res.status(403).json({ success: false, message: 'Chat is not available between these users.' });
     }
 
-    let conv = await Conversation.findOne({
-      product: productId,
-      customer: req.user._id,
-    }).populate('product', 'title images price').populate('vendor', 'name avatar').populate('customer', 'name avatar');
+    let conversation = await prisma.conversation.findUnique({
+      where: { productId_customerId: { productId, customerId: req.user.id } },
+      include: conversationInclude,
+    });
 
-    if (!conv) {
-      conv = await Conversation.create({
-        product: productId,
-        customer: req.user._id,
-        vendor: product.vendorUser,
+    if (!conversation) {
+      conversation = await prisma.conversation.create({
+        data: {
+          productId,
+          customerId: req.user.id,
+          vendorId: product.vendorUserId,
+        },
+        include: conversationInclude,
       });
-      conv = await Conversation.findById(conv._id)
-        .populate('product', 'title images price')
-        .populate('vendor', 'name avatar')
-        .populate('customer', 'name avatar');
     }
-    res.json({ success: true, conversation: conv });
+
+    res.json({ success: true, conversation: toCompat(conversation) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc  Get user conversations
-// @route GET /api/chat/conversations
 exports.getConversations = async (req, res) => {
   try {
-    const conversations = await Conversation.find({
-      $or: [{ customer: req.user._id }, { vendor: req.user._id }],
-    })
-      .populate('product', 'title images price expiresAt')
-      .populate('vendor', 'name avatar')
-      .populate('customer', 'name avatar')
-      .sort({ lastMessageAt: -1 });
-    res.json({ success: true, conversations });
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        OR: [{ customerId: req.user.id }, { vendorId: req.user.id }],
+      },
+      include: conversationInclude,
+      orderBy: { lastMessageAt: 'desc' },
+    });
+    res.json({ success: true, conversations: toCompat(conversations) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc  Get messages in a conversation
-// @route GET /api/chat/:conversationId/messages
 exports.getMessages = async (req, res) => {
   try {
-    const conv = await Conversation.findById(req.params.conversationId);
-    if (!conv) return res.status(404).json({ success: false, message: 'Conversation not found.' });
-    const isParticipant =
-      conv.customer.toString() === req.user._id.toString() ||
-      conv.vendor.toString() === req.user._id.toString();
-    if (!isParticipant) return res.status(403).json({ success: false, message: 'Not authorized.' });
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: req.params.conversationId },
+    });
+    if (!conversation) return res.status(404).json({ success: false, message: 'Conversation not found.' });
+    if (!isParticipant(conversation, req.user.id)) {
+      return res.status(403).json({ success: false, message: 'Not authorized.' });
+    }
 
-    const messages = await Message.find({ conversation: req.params.conversationId })
-      .populate('sender', 'name avatar')
-      .sort({ createdAt: 1 });
-    // Mark as read
-    await Message.updateMany(
-      { conversation: req.params.conversationId, sender: { $ne: req.user._id }, isRead: false },
-      { isRead: true }
-    );
-    res.json({ success: true, messages });
+    const messages = await prisma.message.findMany({
+      where: { conversationId: req.params.conversationId },
+      include: { sender: { select: { id: true, name: true, avatar: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    await prisma.message.updateMany({
+      where: {
+        conversationId: req.params.conversationId,
+        senderId: { not: req.user.id },
+        isRead: false,
+      },
+      data: { isRead: true },
+    });
+
+    res.json({ success: true, messages: toCompat(messages) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc  Send message
-// @route POST /api/chat/:conversationId/messages
 exports.sendMessage = async (req, res) => {
   try {
     const { text, type, offerPrice, meetupDetails } = req.body;
@@ -106,32 +109,43 @@ exports.sendMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Message text is required.' });
     }
 
-    const conv = await Conversation.findById(req.params.conversationId);
-    if (!conv) return res.status(404).json({ success: false, message: 'Conversation not found.' });
-    if (!isParticipant(conv, req.user._id)) {
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: req.params.conversationId },
+    });
+    if (!conversation) return res.status(404).json({ success: false, message: 'Conversation not found.' });
+    if (!isParticipant(conversation, req.user.id)) {
       return res.status(403).json({ success: false, message: 'Not authorized.' });
     }
 
-    const otherUserId = getOtherParticipantId(conv, req.user._id);
-    const block = await findBlockBetween(req.user._id, otherUserId);
+    const otherUserId = getOtherParticipantId(conversation, req.user.id);
+    const block = await findBlockBetween(req.user.id, otherUserId);
     if (block) {
       return res.status(403).json({ success: false, message: 'Chat is not available between these users.' });
     }
 
-    const message = await Message.create({
-      conversation: conv._id,
-      sender: req.user._id,
-      text: text.trim(), type: type || 'text',
-      offerPrice, meetupDetails,
+    const messageText = text.trim();
+    const message = await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: req.user.id,
+        text: messageText,
+        type: type || 'text',
+        offerPrice: offerPrice !== undefined && offerPrice !== null ? Number(offerPrice) : null,
+        meetupDetails: meetupDetails || undefined,
+      },
+      include: { sender: { select: { id: true, name: true, avatar: true } } },
     });
 
-    conv.lastMessage = text.trim();
-    conv.lastMessageAt = new Date();
-    conv.unreadCount += 1;
-    await conv.save();
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        lastMessage: messageText,
+        lastMessageAt: new Date(),
+        unreadCount: { increment: 1 },
+      },
+    });
 
-    const populated = await Message.findById(message._id).populate('sender', 'name avatar');
-    res.status(201).json({ success: true, message: populated });
+    res.status(201).json({ success: true, message: toCompat(message) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

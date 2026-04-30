@@ -1,22 +1,24 @@
-const User = require('../Models/User');
-const Vendor = require('../Models/Vendor');
-const Product = require('../Models/Product');
-const Conversation = require('../Models/Conversation');
-const Message = require('../Models/Message');
-const jwt = require('jsonwebtoken');
-const OTP = require('../Models/otp');
+const bcrypt = require('bcryptjs');
 const fs = require('fs');
+const jwt = require('jsonwebtoken');
 const path = require('path');
+const prisma = require('../Db/prisma');
 const { uploadsDir } = require('../config/uploads');
+const { sanitizeUser, toCompat } = require('../utils/serialize');
+
+const OTP_EXPIRES_MS = 5 * 60 * 1000;
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
 
-const sanitizeUser = (user) => {
-  if (!user) return user;
-  const obj = user.toObject ? user.toObject() : { ...user };
-  delete obj.password;
-  return obj;
+const isOtpExpired = (otp) =>
+  !otp?.createdAt || Date.now() - new Date(otp.createdAt).getTime() > OTP_EXPIRES_MS;
+
+const userLookupWhere = (email, phone) => {
+  const filters = [];
+  if (email) filters.push({ email: email.toLowerCase() });
+  if (phone) filters.push({ phone });
+  return filters.length ? { OR: filters } : {};
 };
 
 const deleteUploadedFile = async (fileName) => {
@@ -36,27 +38,29 @@ const deleteUploadedFile = async (fileName) => {
 exports.registerCustomer = async (req, res) => {
   try {
     const { name, email, phone, password, otp } = req.body;
+    const normalizedEmail = email?.toLowerCase().trim();
 
-    if (!name || !email || !password || !otp) {
+    if (!name || !normalizedEmail || !password || !otp) {
       return res.status(400).json({
         success: false,
         message: 'All fields including OTP are required',
       });
     }
 
-    const recentOtp = await OTP.find({ email })
-      .sort({ createdAt: -1 })
-      .limit(1);
+    const recentOtp = await prisma.otp.findFirst({
+      where: { email: normalizedEmail },
+      orderBy: { createdAt: 'desc' },
+    });
 
-    if (recentOtp.length === 0 || recentOtp[0].otp !== otp) {
+    if (!recentOtp || isOtpExpired(recentOtp) || recentOtp.otp !== otp) {
       return res.status(400).json({
         success: false,
         message: 'Invalid or expired OTP',
       });
     }
 
-    const existing = await User.findOne({
-      $or: [{ email }, { phone }],
+    const existing = await prisma.user.findFirst({
+      where: userLookupWhere(normalizedEmail, phone),
     });
 
     if (existing) {
@@ -66,19 +70,22 @@ exports.registerCustomer = async (req, res) => {
       });
     }
 
-    const user = await User.create({
-      name,
-      email,
-      phone,
-      password,
-      role: 'customer',
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email: normalizedEmail,
+        phone: phone || null,
+        password: hashedPassword,
+        role: 'customer',
+      },
     });
 
-    await OTP.deleteMany({ email });
+    await prisma.otp.deleteMany({ where: { email: normalizedEmail } });
 
     res.status(201).json({
       success: true,
-      token: generateToken(user._id),
+      token: generateToken(user.id),
       user: sanitizeUser(user),
     });
   } catch (error) {
@@ -102,34 +109,36 @@ exports.registerVendor = async (req, res) => {
       businessCategory,
       businessAddress,
     } = req.body;
+    const normalizedEmail = email?.toLowerCase().trim();
 
-    if (!name || !email || !phone || !password || !otp || !businessName) {
+    if (!name || !normalizedEmail || !phone || !password || !otp || !businessName) {
       return res.status(400).json({
         success: false,
         message: 'All required fields missing',
       });
     }
 
-    const recentOtp = await OTP.find({ email })
-      .sort({ createdAt: -1 })
-      .limit(1);
+    const recentOtp = await prisma.otp.findFirst({
+      where: { email: normalizedEmail },
+      orderBy: { createdAt: 'desc' },
+    });
 
-    if (recentOtp.length === 0) {
+    if (!recentOtp || isOtpExpired(recentOtp)) {
       return res.status(400).json({
         success: false,
         message: 'OTP expired',
       });
     }
 
-    if (recentOtp[0].otp.toString() !== otp.toString()) {
+    if (recentOtp.otp.toString() !== otp.toString()) {
       return res.status(400).json({
         success: false,
         message: 'Invalid OTP',
       });
     }
 
-    const existing = await User.findOne({
-      $or: [{ email }, { phone }],
+    const existing = await prisma.user.findFirst({
+      where: userLookupWhere(normalizedEmail, phone),
     });
 
     if (existing) {
@@ -139,34 +148,43 @@ exports.registerVendor = async (req, res) => {
       });
     }
 
-    const user = await User.create({
-      name,
-      email,
-      phone,
-      password,
-      role: 'vendor',
-    });
-
     const livePhoto = req.files?.livePhoto?.[0]?.filename || '';
     const liveVideo = req.files?.liveVideo?.[0]?.filename || '';
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    const vendor = await Vendor.create({
-      user: user._id,
-      businessName,
-      businessDescription,
-      businessCategory,
-      businessAddress,
-      livePhoto,
-      liveVideo,
+    const { user, vendor } = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          name,
+          email: normalizedEmail,
+          phone,
+          password: hashedPassword,
+          role: 'vendor',
+        },
+      });
+
+      const createdVendor = await tx.vendor.create({
+        data: {
+          userId: createdUser.id,
+          businessName,
+          businessDescription,
+          businessCategory,
+          businessAddress,
+          livePhoto,
+          liveVideo,
+        },
+      });
+
+      await tx.otp.deleteMany({ where: { email: normalizedEmail } });
+
+      return { user: createdUser, vendor: createdVendor };
     });
-
-    await OTP.deleteMany({ email });
 
     res.status(201).json({
       success: true,
-      token: generateToken(user._id),
+      token: generateToken(user.id),
       user: sanitizeUser(user),
-      vendor,
+      vendor: toCompat(vendor),
     });
   } catch (error) {
     res.status(500).json({
@@ -179,15 +197,25 @@ exports.registerVendor = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { emailOrPhone, password } = req.body;
+    const loginId = emailOrPhone?.trim();
 
-    const user = await User.findOne({
-      $or: [
-        { email: emailOrPhone },
-        { phone: emailOrPhone },
-      ],
+    if (!loginId || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email/phone and password are required',
+      });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: loginId.toLowerCase() },
+          { phone: loginId },
+        ],
+      },
     });
 
-    if (!user || !(await user.matchPassword(password))) {
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials',
@@ -197,14 +225,14 @@ exports.login = async (req, res) => {
     let vendorProfile = null;
 
     if (user.role === 'vendor') {
-      vendorProfile = await Vendor.findOne({ user: user._id });
+      vendorProfile = await prisma.vendor.findUnique({ where: { userId: user.id } });
     }
 
     res.json({
       success: true,
-      token: generateToken(user._id),
+      token: generateToken(user.id),
       user: sanitizeUser(user),
-      vendorProfile,
+      vendorProfile: toCompat(vendorProfile),
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -218,13 +246,13 @@ exports.getMe = async (req, res) => {
     let vendorProfile = null;
 
     if (user.role === 'vendor') {
-      vendorProfile = await Vendor.findOne({ user: user._id });
+      vendorProfile = await prisma.vendor.findUnique({ where: { userId: user.id } });
     }
 
     res.json({
       success: true,
       user: sanitizeUser(user),
-      vendorProfile,
+      vendorProfile: toCompat(vendorProfile),
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -233,8 +261,8 @@ exports.getMe = async (req, res) => {
 
 exports.deleteMe = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const user = await User.findById(userId);
+    const userId = req.user.id;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -246,7 +274,7 @@ exports.deleteMe = async (req, res) => {
       filesToDelete.push(user.avatar);
     }
 
-    const vendorProfile = await Vendor.findOne({ user: userId });
+    const vendorProfile = await prisma.vendor.findUnique({ where: { userId } });
 
     if (vendorProfile) {
       filesToDelete.push(
@@ -257,11 +285,14 @@ exports.deleteMe = async (req, res) => {
       );
     }
 
-    const productQuery = vendorProfile
-      ? { $or: [{ vendorUser: userId }, { vendor: vendorProfile._id }] }
-      : { vendorUser: userId };
+    const productWhere = vendorProfile
+      ? { OR: [{ vendorUserId: userId }, { vendorId: vendorProfile.id }] }
+      : { vendorUserId: userId };
 
-    const products = await Product.find(productQuery).select('images');
+    const products = await prisma.product.findMany({
+      where: productWhere,
+      select: { id: true, images: true },
+    });
 
     products.forEach((product) => {
       if (Array.isArray(product.images)) {
@@ -269,29 +300,34 @@ exports.deleteMe = async (req, res) => {
       }
     });
 
-    const conversations = await Conversation.find({
-      $or: [{ customer: userId }, { vendor: userId }],
-    }).select('_id');
-    const conversationIds = conversations.map((conversation) => conversation._id);
+    const conversations = await prisma.conversation.findMany({
+      where: { OR: [{ customerId: userId }, { vendorId: userId }] },
+      select: { id: true },
+    });
+    const conversationIds = conversations.map((conversation) => conversation.id);
+    const productIds = products.map((product) => product.id);
 
-    if (conversationIds.length) {
-      await Message.deleteMany({ conversation: { $in: conversationIds } });
-      await Conversation.deleteMany({ _id: { $in: conversationIds } });
-    }
+    await prisma.$transaction(async (tx) => {
+      if (conversationIds.length) {
+        await tx.message.deleteMany({ where: { conversationId: { in: conversationIds } } });
+        await tx.conversation.deleteMany({ where: { id: { in: conversationIds } } });
+      }
 
-    if (products.length) {
-      await Product.deleteMany({ _id: { $in: products.map((product) => product._id) } });
-    }
+      if (productIds.length) {
+        await tx.product.deleteMany({ where: { id: { in: productIds } } });
+      }
 
-    if (vendorProfile) {
-      await Vendor.deleteOne({ _id: vendorProfile._id });
-    }
+      if (vendorProfile) {
+        await tx.vendor.delete({ where: { id: vendorProfile.id } });
+      }
 
-    if (user.email) {
-      await OTP.deleteMany({ email: user.email });
-    }
+      if (user.email) {
+        await tx.otp.deleteMany({ where: { email: user.email } });
+      }
 
-    await User.deleteOne({ _id: userId });
+      await tx.user.delete({ where: { id: userId } });
+    });
+
     await Promise.allSettled(filesToDelete.map(deleteUploadedFile));
 
     res.json({ success: true, message: 'Account deleted successfully' });
