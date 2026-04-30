@@ -29,13 +29,36 @@ React environment variables are public. `client/src/config.js` already falls bac
 
 Android already exists at `client/android` and Capacitor Android 7 requires JDK 21 for Gradle builds. If your terminal still uses Java 17, switch `JAVA_HOME` to a JDK 21 install before running Gradle. iOS is generated when needed and requires a Mac, an Apple Developer account, and Xcode 26 or newer. Before iOS sync/archive, make sure `xcode-select` points to the full Xcode app and the Xcode license has been accepted.
 
-The current Capacitor app id and Android package are `com.goodone.marketplace`. Finalize this before the first Play Store or App Store upload. If it needs to change, update `client/capacitor.config.json`, `client/android/app/build.gradle`, and the Xcode target Bundle Identifier.
+The current Capacitor app id and Android package are `com.goodone.marketplace`. Finalize this before the first Play Store or App Store upload. If it needs to change, update `client/capacitor.config.json`, `client/android/app/build.gradle`, `client/android/app/src/main/res/values/strings.xml`, and the Xcode target Bundle Identifier.
+
+Public policy routes are available without login:
+
+- `/privacy`
+- `/account-deletion`
 
 ## Android release signing
 
-Do not commit Android keystores, `key.properties`, or signing passwords. Use `client/android/key.properties.example` as a local template for release signing values.
+Do not commit Android keystores, `key.properties`, or signing passwords. Use `client/android/key.properties.example` as a local template for release signing values. The Android Gradle release signing config reads local `client/android/key.properties` only when that file exists.
 
 For Play Store release builds, open Android Studio and use `Build > Generate Signed Bundle / APK > Android App Bundle`. The Play Store needs a signed AAB, not just a debug APK.
+
+Android is currently `versionCode 1` and `versionName 1.0`. Every future Play Store upload must increment `versionCode`.
+
+## iOS release setup
+
+iOS is currently `MARKETING_VERSION 1.0` and `CURRENT_PROJECT_VERSION 1`. Every future App Store upload must increment the iOS build number.
+
+If this Mac is still pointed at Command Line Tools, run:
+
+```sh
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -license accept
+sudo xcodebuild -runFirstLaunch
+cd client
+npm run build
+npx cap sync ios
+npx cap open ios
+```
 
 To generate and open iOS:
 
@@ -79,19 +102,21 @@ npx cap open ios
 
 - In Xcode, use `Product > Archive > Distribute App`.
 
-Store assets:
+Store submission checklist:
 
+- Signed Android AAB
+- Apple archive uploaded from Xcode
 - App icon
 - Splash screen
-- Android screenshots
-- iPhone screenshots
+- Screenshots
 - Privacy policy URL
+- Account deletion URL
 - Support email
 - Reviewer test account
 - Google Data Safety
 - Apple App Privacy
 - Content rating
-- Account deletion URL
+- Demo notes for reviewer
 
 ## Final Production Checklist
 
