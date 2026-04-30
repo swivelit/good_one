@@ -1,4 +1,5 @@
 const prisma = require('../Db/prisma');
+const { assertCleanFields } = require('../utils/contentModeration');
 const { toCompat } = require('../utils/serialize');
 
 const productInclude = {
@@ -41,6 +42,17 @@ const productDataFromBody = (body) => {
   if (body.tags !== undefined) data.tags = parseTags(body.tags);
 
   return data;
+};
+
+const assertCleanProductFields = (body) => {
+  assertCleanFields({
+    title: body.title,
+    description: body.description,
+    category: body.category,
+    condition: body.condition,
+    location: body.location,
+    tags: body.tags,
+  });
 };
 
 exports.getProducts = async (req, res) => {
@@ -114,6 +126,8 @@ exports.createProduct = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing required product fields.' });
     }
 
+    assertCleanProductFields(req.body);
+
     const images = req.files ? req.files.map((file) => file.filename) : [];
     const product = await prisma.product.create({
       data: {
@@ -132,6 +146,9 @@ exports.createProduct = async (req, res) => {
 
     res.status(201).json({ success: true, product: toCompat(product) });
   } catch (error) {
+    if (error.statusCode === 400) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -144,12 +161,17 @@ exports.updateProduct = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized.' });
     }
 
+    assertCleanProductFields(req.body);
+
     const updated = await prisma.product.update({
       where: { id: req.params.id },
       data: productDataFromBody(req.body),
     });
     res.json({ success: true, product: toCompat(updated) });
   } catch (error) {
+    if (error.statusCode === 400) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -16,7 +16,7 @@ function getTimeLeft(expiresAt) {
 
 const CONDITION_LABELS = { 'new':'New','like-new':'Like New','good':'Good','fair':'Fair','poor':'Poor' };
 const CONDITION_COLORS = { 'new':'success','like-new':'info','good':'primary','fair':'warning','poor':'secondary' };
- const PLACEHOLDER = "/images/no-image.png";
+ const PLACEHOLDER = "/logo512.png";
 
 export default function ProductCard({ product }) {
 

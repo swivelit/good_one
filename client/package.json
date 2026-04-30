@@ -32,8 +32,11 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "cap:sync": "npm run build && cap sync",
-    "cap:android": "npm run cap:sync && cap open android",
-    "cap:ios": "npm run cap:sync && cap open ios"
+    "cap:add:ios": "cap add ios",
+    "cap:sync:android": "npm run build && cap sync android",
+    "cap:sync:ios": "npm run build && cap sync ios",
+    "cap:android": "npm run cap:sync:android && cap open android",
+    "cap:ios": "npm run cap:sync:ios && cap open ios"
   },
   "eslintConfig": {
     "extends": [

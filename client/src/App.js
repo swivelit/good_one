@@ -1,5 +1,6 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './AuthContext';
 import Navbar from './Navbar';
@@ -17,7 +18,7 @@ import NotFound from './pages/NotFoundPage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import AccountDeletionPage from './pages/AccountDeletionPage';
 
-
+const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter;
 
 const PrivateRoute = ({ children, role }) => {
   const { user, loading } = useAuth();
@@ -54,10 +55,10 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <Router>
         <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
         <AppRoutes />
-      </BrowserRouter>
+      </Router>
     </AuthProvider>
   );
 }

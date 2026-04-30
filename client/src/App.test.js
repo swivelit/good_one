@@ -1,8 +1,27 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
+jest.mock('react-router-dom', () => {
+  const React = require('react');
+
+  return {
+    BrowserRouter: ({ children }) => <>{children}</>,
+    HashRouter: ({ children }) => <>{children}</>,
+    Routes: () => null,
+    Route: () => null,
+    Navigate: () => null,
+    Link: ({ children, to, ...props }) => (
+      <a href={typeof to === 'string' ? to : '#'} {...props}>
+        {children}
+      </a>
+    ),
+    useNavigate: () => jest.fn(),
+    useParams: () => ({}),
+    useSearchParams: () => [new URLSearchParams(), jest.fn()],
+  };
+}, { virtual: true });
+
+test('renders GoodOne app shell', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  expect(screen.getAllByText(/GoodOne/i).length).toBeGreaterThan(0);
 });

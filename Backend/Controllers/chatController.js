@@ -1,4 +1,5 @@
 const prisma = require('../Db/prisma');
+const { assertCleanFields } = require('../utils/contentModeration');
 const { toCompat } = require('../utils/serialize');
 
 const conversationInclude = {
@@ -124,6 +125,8 @@ exports.sendMessage = async (req, res) => {
     }
 
     const messageText = text.trim();
+    assertCleanFields({ text: messageText });
+
     const message = await prisma.message.create({
       data: {
         conversationId: conversation.id,
@@ -147,6 +150,9 @@ exports.sendMessage = async (req, res) => {
 
     res.status(201).json({ success: true, message: toCompat(message) });
   } catch (error) {
+    if (error.statusCode === 400) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 };
