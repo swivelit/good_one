@@ -11,7 +11,12 @@ const generateOtp = () =>
     specialChars: false,
   });
 
-const getOtpForRequest = () => process.env.OTP_BYPASS_CODE || generateOtp();
+const isTestOtpEnabled = () =>
+  process.env.ENABLE_TEST_OTP === 'true' &&
+  Boolean(process.env.OTP_BYPASS_CODE);
+
+const getOtpForRequest = () =>
+  isTestOtpEnabled() ? process.env.OTP_BYPASS_CODE : generateOtp();
 
 const otpEmailBody = (otp) => `
   <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -62,7 +67,7 @@ exports.sendOtp = async (req, res) => {
     await prisma.otp.deleteMany({ where: { email: normalizedEmail } });
     await prisma.otp.create({ data: { email: normalizedEmail, otp } });
 
-    if (process.env.OTP_BYPASS_CODE) {
+    if (isTestOtpEnabled()) {
       return res.status(200).json({
         success: true,
         message: 'Test OTP generated successfully',
@@ -127,7 +132,7 @@ exports.resendOtp = async (req, res) => {
       },
     });
 
-    if (process.env.OTP_BYPASS_CODE) {
+    if (isTestOtpEnabled()) {
       return res.status(200).json({
         success: true,
         message: 'Test OTP resent successfully',

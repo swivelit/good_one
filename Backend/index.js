@@ -38,6 +38,21 @@ const io = new Server(server, {
 const isConversationParticipant = (conversation, userId) =>
   conversation.customerId === userId || conversation.vendorId === userId;
 
+const findAuthorizedConversation = async (conversationId, userId) => {
+  if (!conversationId) return null;
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { customerId: true, vendorId: true },
+  });
+
+  if (!conversation || !isConversationParticipant(conversation, userId)) {
+    return null;
+  }
+
+  return conversation;
+};
+
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
@@ -128,12 +143,32 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('typing', (data) => {
-    socket.to(data.conversationId).emit('user-typing', { userId: socket.user.id });
+  socket.on('typing', async (data) => {
+    try {
+      const conversationId = data?.conversationId;
+      if (!conversationId) return;
+
+      const conversation = await findAuthorizedConversation(conversationId, socket.user.id);
+      if (!conversation) return;
+
+      socket.to(conversationId).emit('user-typing', { userId: socket.user.id });
+    } catch (error) {
+      socket.emit('error-message', { message: 'Failed to send typing status.' });
+    }
   });
 
-  socket.on('stop-typing', (data) => {
-    socket.to(data.conversationId).emit('user-stop-typing', { userId: socket.user.id });
+  socket.on('stop-typing', async (data) => {
+    try {
+      const conversationId = data?.conversationId;
+      if (!conversationId) return;
+
+      const conversation = await findAuthorizedConversation(conversationId, socket.user.id);
+      if (!conversation) return;
+
+      socket.to(conversationId).emit('user-stop-typing', { userId: socket.user.id });
+    } catch (error) {
+      socket.emit('error-message', { message: 'Failed to send typing status.' });
+    }
   });
 
   socket.on('disconnect', () => {
