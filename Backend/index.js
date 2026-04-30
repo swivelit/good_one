@@ -122,7 +122,7 @@ io.on('connection', (socket) => {
         return;
       }
 
-      io.to(conversationId).emit('receive-message', data);
+      socket.to(conversationId).emit('receive-message', data);
     } catch (error) {
       socket.emit('error-message', { message: 'Failed to send real-time message.' });
     }

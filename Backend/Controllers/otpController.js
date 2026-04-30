@@ -11,6 +11,8 @@ const generateOtp = () =>
     specialChars: false,
   });
 
+const getOtpForRequest = () => process.env.OTP_BYPASS_CODE || generateOtp();
+
 const otpEmailBody = (otp) => `
   <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
     <h2 style="color: #2c3e50;">Good_one Verification</h2>
@@ -54,11 +56,19 @@ exports.sendOtp = async (req, res) => {
       });
     }
 
-    const otp = generateOtp();
+    const otp = getOtpForRequest();
 
     await deleteExpiredOtps();
     await prisma.otp.deleteMany({ where: { email: normalizedEmail } });
     await prisma.otp.create({ data: { email: normalizedEmail, otp } });
+
+    if (process.env.OTP_BYPASS_CODE) {
+      return res.status(200).json({
+        success: true,
+        message: 'Test OTP generated successfully',
+        testOtpEnabled: true,
+      });
+    }
 
     await mailSender(normalizedEmail, 'Your OTP Code - Good_one', otpEmailBody(otp));
 
@@ -105,7 +115,7 @@ exports.resendOtp = async (req, res) => {
       });
     }
 
-    const otp = generateOtp();
+    const otp = getOtpForRequest();
     const resendBlockedUntil = new Date(Date.now() + 30 * 1000);
 
     await prisma.otp.deleteMany({ where: { email: normalizedEmail } });
@@ -116,6 +126,14 @@ exports.resendOtp = async (req, res) => {
         resendBlockedUntil,
       },
     });
+
+    if (process.env.OTP_BYPASS_CODE) {
+      return res.status(200).json({
+        success: true,
+        message: 'Test OTP resent successfully',
+        testOtpEnabled: true,
+      });
+    }
 
     await mailSender(normalizedEmail, 'Your OTP Code - Good_one', otpEmailBody(otp));
 
