@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { productAPI } from "../api";
 import ProductCard from "../productCard";
 import toast from "react-hot-toast";
@@ -32,6 +33,7 @@ export default function HomePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const search = searchParams.get("search") || "";
+  const browsePath = Capacitor.isNativePlatform() ? "/browse" : "/";
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -207,7 +209,7 @@ export default function HomePage() {
               </span>
               <button
                 className="btn btn-sm btn-outline-warning ms-auto"
-                onClick={() => navigate("/")}
+                onClick={() => navigate(browsePath)}
               >
                 Clear
               </button>

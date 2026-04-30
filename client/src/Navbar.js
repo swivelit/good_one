@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { useAuth } from "./AuthContext";
 import toast from "react-hot-toast";
 
@@ -7,20 +8,22 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const browsePath = Capacitor.isNativePlatform() ? "/browse" : "/";
+  const logoutPath = Capacitor.isNativePlatform() ? "/" : "/login";
 
   const handleLogout = () => {
     logout();
     toast.success("Logged out successfully");
-    navigate("/login");
+    navigate(logoutPath);
   };
 
   const handleSearch = (e) => {
     e.preventDefault();
 
     if (search.trim()) {
-      navigate(`/?search=${search}`);
+      navigate(`${browsePath}?search=${encodeURIComponent(search.trim())}`);
     } else {
-      navigate(`/`);
+      navigate(browsePath);
     }
   };
 
@@ -73,7 +76,7 @@ export default function Navbar() {
           {/* Nav links */}
           <ul className="navbar-nav ms-auto align-items-center gap-1">
             <li className="nav-item">
-              <Link className="nav-link fw-500" to="/">
+              <Link className="nav-link fw-500" to={browsePath}>
                 Browse
               </Link>
             </li>

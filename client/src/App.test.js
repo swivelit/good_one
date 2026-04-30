@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
+import MobileWelcomePage from './pages/MobileWelcomePage';
 
 jest.mock('react-router-dom', () => {
   const React = require('react');
@@ -24,4 +25,13 @@ jest.mock('react-router-dom', () => {
 test('renders GoodOne app shell', () => {
   render(<App />);
   expect(screen.getAllByText(/GoodOne/i).length).toBeGreaterThan(0);
+});
+
+test('MobileWelcomePage renders native auth choices', () => {
+  render(<MobileWelcomePage />);
+
+  expect(screen.getByText(/GoodOne/i)).toBeInTheDocument();
+  expect(screen.getByText(/Sign In/i)).toBeInTheDocument();
+  expect(screen.getByText(/Create Customer Account/i)).toBeInTheDocument();
+  expect(screen.getByText(/Become a Vendor/i)).toBeInTheDocument();
 });

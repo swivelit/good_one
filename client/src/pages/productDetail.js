@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { productAPI, chatAPI, reportAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import toast from "react-hot-toast";
@@ -26,6 +27,7 @@ export default function ProductDetail() {
   const [chatLoading, setChatLoading] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const browsePath = Capacitor.isNativePlatform() ? "/browse" : "/";
 
  useEffect(() => {
     productAPI
@@ -107,7 +109,7 @@ export default function ProductDetail() {
       <div className="container py-5 text-center">
         <i className="bi bi-box-seam display-1 text-muted"></i>
         <h4 className="mt-3">Product not found</h4>
-        <Link to="/" className="btn btn-primary-custom mt-3">
+        <Link to={browsePath} className="btn btn-primary-custom mt-3">
           ← Browse Products
         </Link>
       </div>
@@ -124,10 +126,10 @@ export default function ProductDetail() {
       <nav aria-label="breadcrumb" className="mb-4">
         <ol className="breadcrumb">
           <li className="breadcrumb-item">
-            <Link to="/">Home</Link>
+            <Link to={browsePath}>Home</Link>
           </li>
           <li className="breadcrumb-item">
-            <Link to={`/?category=${product.category}`}>
+            <Link to={`${browsePath}?category=${encodeURIComponent(product.category)}`}>
               {product.category}
             </Link>
           </li>

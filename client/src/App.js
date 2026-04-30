@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import Navbar from './Navbar';
 import Footer from './footer';
 import HomePage from './pages/HomePage';
+import MobileWelcomePage from './pages/MobileWelcomePage';
 import LoginPage from './pages/loginpage';
 import RegisterCustomer from './pages/RegisterConstomerpage';
 import RegisterVendor from './pages/registervendor';
@@ -28,12 +29,23 @@ const PrivateRoute = ({ children, role }) => {
   return children;
 };
 
+const NativeStartRoute = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) return <div className="d-flex justify-content-center align-items-center" style={{minHeight:'60vh'}}><div className="spinner-border text-warning" /></div>;
+  if (!Capacitor.isNativePlatform()) return <HomePage />;
+  if (!user) return <MobileWelcomePage />;
+  if (user.role === "vendor") return <Navigate to="/dashboard" replace />;
+  return <HomePage />;
+};
+
 function AppRoutes() {
   return (
     <>
       <Navbar />
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<NativeStartRoute />} />
+        <Route path="/browse" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register/customer" element={<RegisterCustomer />} />
         <Route path="/register/vendor" element={<RegisterVendor />} />
