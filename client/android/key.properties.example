@@ -1,0 +1,4 @@
+storeFile=/absolute/path/to/goodone-release-key.jks
+storePassword=CHANGE_ME
+keyAlias=goodone
+keyPassword=CHANGE_ME

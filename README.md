@@ -4,7 +4,7 @@ GoodOne marketplace.
 
 ## Frontend production environment
 
-`client/.env.production` contains the public production app configuration:
+`client/.env.production` is ignored by git, so do not rely on it being committed. Before final mobile builds, create it locally from `client/.env.production.example`, or set the same variables in the Render frontend environment:
 
 ```sh
 REACT_APP_BACKEND_URL=https://good-one-api.onrender.com
@@ -13,6 +13,8 @@ REACT_APP_SUPPORT_EMAIL=goodone@swivelit.in
 ```
 
 Replace `https://good-one-api.onrender.com` before production builds if the real Render backend URL is different. Do not put secrets in React environment files because they are bundled into the app.
+
+React environment variables are public. `client/src/config.js` already falls back to `https://good-one-api.onrender.com` for production builds when these values are not set.
 
 ## Render backend deployment
 
@@ -26,6 +28,14 @@ Replace `https://good-one-api.onrender.com` before production builds if the real
 ## Capacitor mobile apps
 
 Android already exists at `client/android` and Capacitor Android 7 requires JDK 21 for Gradle builds. If your terminal still uses Java 17, switch `JAVA_HOME` to a JDK 21 install before running Gradle. iOS is generated when needed and requires a Mac, an Apple Developer account, and Xcode 26 or newer. Before iOS sync/archive, make sure `xcode-select` points to the full Xcode app and the Xcode license has been accepted.
+
+The current Capacitor app id and Android package are `com.goodone.marketplace`. Finalize this before the first Play Store or App Store upload. If it needs to change, update `client/capacitor.config.json`, `client/android/app/build.gradle`, and the Xcode target Bundle Identifier.
+
+## Android release signing
+
+Do not commit Android keystores, `key.properties`, or signing passwords. Use `client/android/key.properties.example` as a local template for release signing values.
+
+For Play Store release builds, open Android Studio and use `Build > Generate Signed Bundle / APK > Android App Bundle`. The Play Store needs a signed AAB, not just a debug APK.
 
 To generate and open iOS:
 
@@ -54,8 +64,8 @@ npx cap sync android
 npx cap open android
 ```
 
-- In Android Studio, use `Build > Generate Signed Bundle / APK`.
-- Output should be an AAB for the Play Store.
+- In Android Studio, use `Build > Generate Signed Bundle / APK > Android App Bundle`.
+- Output must be a signed AAB for the Play Store, not just a debug APK.
 
 iOS:
 
@@ -73,13 +83,15 @@ Store assets:
 
 - App icon
 - Splash screen
-- Screenshots
+- Android screenshots
+- iPhone screenshots
 - Privacy policy URL
 - Support email
-- Reviewer test login
-- Data Safety
-- App Privacy
+- Reviewer test account
+- Google Data Safety
+- Apple App Privacy
 - Content rating
+- Account deletion URL
 
 ## Final Production Checklist
 
