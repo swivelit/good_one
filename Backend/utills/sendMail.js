@@ -6,16 +6,27 @@ const mailSender = async (email, title, body) => {
       throw new Error("Email service is not configured");
     }
 
-    let transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    const auth = {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    };
+
+    const transporterConfig = process.env.EMAIL_HOST
+      ? {
+          host: process.env.EMAIL_HOST,
+          port: Number(process.env.EMAIL_PORT || 587),
+          secure: process.env.EMAIL_SECURE === "true",
+          auth,
+        }
+      : {
+          service: "gmail",
+          auth,
+        };
+
+    let transporter = nodemailer.createTransport(transporterConfig);
 
     let info = await transporter.sendMail({
-      from: `"Auth System" <${process.env.EMAIL_USER}>`,
+      from: process.env.EMAIL_FROM || `"GoodOne" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: title,
       html: body,

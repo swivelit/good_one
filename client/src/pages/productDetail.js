@@ -119,8 +119,6 @@ export default function ProductDetail() {
     ? product.images.map((i) => getUploadUrl(i))
     : [PLACEHOLDER];
 
-  console.log("Product images:", product.images);
-
   return (
     <div className="container py-4 py-md-5">
       <nav aria-label="breadcrumb" className="mb-4">

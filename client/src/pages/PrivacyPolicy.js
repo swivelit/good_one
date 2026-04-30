@@ -32,11 +32,6 @@ export default function PrivacyPolicy() {
       <p>
         For privacy questions, contact <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
-
-      <div className="alert alert-warning mt-4">
-        App owner note: replace this placeholder policy and contact email with
-        your real legal, privacy, and support details before publishing.
-      </div>
     </main>
   );
 }
