@@ -4,6 +4,7 @@ import { productAPI, statsAPI } from '../api';
 
 const mockNavigate = jest.fn();
 let mockSearchParams = new URLSearchParams();
+let mockUser = null;
 
 jest.mock('react-router-dom', () => ({
   Link: ({ children, to, ...props }) => (
@@ -28,6 +29,12 @@ jest.mock('../productCard', () => function ProductCardMock({ product }) {
   return <div>{product.title}</div>;
 });
 
+jest.mock('../AuthContext', () => ({
+  useAuth: () => ({
+    user: mockUser,
+  }),
+}));
+
 jest.mock('react-countup', () => ({
   __esModule: true,
   default: function CountUpMock({ end }) {
@@ -39,6 +46,7 @@ describe('HomePage browse filters', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     mockSearchParams = new URLSearchParams();
+    mockUser = null;
     productAPI.getAll.mockResolvedValue({ data: { products: [], pages: 1, total: 0 } });
     statsAPI.getPublic.mockResolvedValue({
       data: {
@@ -87,5 +95,14 @@ describe('HomePage browse filters', () => {
         search: 'iphone',
       });
     });
+  });
+
+  test('logged-in customer sees My Profile prompt while browsing', async () => {
+    mockUser = { name: 'Good Customer', role: 'customer' };
+
+    render(<HomePage />);
+
+    expect(await screen.findByText(/No products found/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /my profile/i })).toHaveAttribute('href', '/profile');
   });
 });

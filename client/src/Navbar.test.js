@@ -4,6 +4,8 @@ import Navbar from './Navbar';
 
 const mockNavigate = jest.fn();
 let mockLocation = { pathname: '/', search: '', hash: '', state: null };
+let mockUser = null;
+const mockLogout = jest.fn();
 
 jest.mock('@capacitor/core', () => ({
   Capacitor: {
@@ -23,14 +25,16 @@ jest.mock('react-router-dom', () => ({
 
 jest.mock('./AuthContext', () => ({
   useAuth: () => ({
-    user: null,
-    logout: jest.fn(),
+    user: mockUser,
+    logout: mockLogout,
   }),
 }));
 
 describe('Navbar search', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
+    mockLogout.mockClear();
+    mockUser = null;
     mockLocation = { pathname: '/', search: '', hash: '', state: null };
     Capacitor.isNativePlatform.mockReturnValue(false);
   });
@@ -53,5 +57,17 @@ describe('Navbar search', () => {
     fireEvent.change(input, { target: { value: '' } });
 
     expect(mockNavigate).toHaveBeenCalledWith('/browse');
+  });
+
+  test('logged-in customer sees a direct Profile nav link on web', () => {
+    mockUser = { name: 'Good Customer', role: 'customer' };
+
+    render(<Navbar />);
+
+    const profileNavLink = screen
+      .getAllByRole('link', { name: /profile/i })
+      .find((link) => link.className.includes('nav-link'));
+
+    expect(profileNavLink).toHaveAttribute('href', '/profile');
   });
 });

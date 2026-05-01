@@ -16,8 +16,8 @@ jest.mock('react-router-dom', () => {
   return {
     BrowserRouter: ({ children }) => <>{children}</>,
     HashRouter: ({ children }) => <>{children}</>,
-    Routes: () => null,
-    Route: () => null,
+    Routes: ({ children }) => <>{children}</>,
+    Route: ({ path }) => <div data-testid={`route-${path}`} />,
     Navigate: () => null,
     Link: ({ children, to, ...props }) => (
       <a href={typeof to === 'string' ? to : '#'} {...props}>
@@ -38,6 +38,13 @@ beforeEach(() => {
 test('renders GoodOne app shell', () => {
   render(<App />);
   expect(screen.getAllByText(/GoodOne/i).length).toBeGreaterThan(0);
+});
+
+test('registers profile and account routes', () => {
+  render(<App />);
+
+  expect(screen.getByTestId('route-/profile')).toBeInTheDocument();
+  expect(screen.getByTestId('route-/account')).toBeInTheDocument();
 });
 
 test('MobileWelcomePage renders native auth choices', () => {

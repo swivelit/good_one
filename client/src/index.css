@@ -607,6 +607,40 @@ body {
   margin-top: 1.5rem;
 }
 
+.customer-profile-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(255, 107, 53, 0.14);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fff8f4, #fff);
+  box-shadow: 0 8px 22px rgba(44, 62, 80, 0.06);
+}
+
+.customer-profile-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.customer-profile-copy span {
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.customer-profile-copy strong {
+  color: var(--secondary);
+  line-height: 1.25;
+}
+
+.customer-profile-copy small {
+  color: #6b7280;
+}
+
 .native-app-shell .dashboard-sidebar {
   min-height: auto;
 }
@@ -883,6 +917,16 @@ body {
   .profile-actions .btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .customer-profile-prompt {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 0.85rem;
+  }
+
+  .customer-profile-prompt .btn {
+    width: 100%;
   }
 
   .native-app-shell .vendor-dashboard-content {

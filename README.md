@@ -36,6 +36,10 @@ Public policy routes are available without login:
 - `/privacy`
 - `/account-deletion`
 
+### App icon assets
+
+Web/PWA icons are declared in `client/public/manifest.json` and served from `client/public` assets. Native Android/iOS launcher icons are not read directly from `client/public/logo.png`; run `cd client && npm run assets:generate` to rebuild `client/resources/icon.png` from `public/logo.png` and then generate the Android `mipmap-*` launcher icons and iOS `AppIcon` assets.
+
 ## Android release signing
 
 Do not commit Android keystores, `key.properties`, or signing passwords. Use `client/android/key.properties.example` as a local template for release signing values. The Android Gradle release signing config reads local `client/android/key.properties` only when that file exists.

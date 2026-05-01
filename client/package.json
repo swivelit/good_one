@@ -37,9 +37,10 @@
     "cap:sync:ios": "npm run build && cap sync ios",
     "cap:android": "npm run cap:sync:android && cap open android",
     "cap:ios": "npm run cap:sync:ios && cap open ios",
-    "assets:generate": "capacitor-assets generate",
-    "assets:generate:android": "capacitor-assets generate --android",
-    "assets:generate:ios": "capacitor-assets generate --ios"
+    "assets:prepare": "node scripts/generate-app-icons-from-logo.js",
+    "assets:generate": "npm run assets:prepare && capacitor-assets generate",
+    "assets:generate:android": "npm run assets:prepare && capacitor-assets generate --android",
+    "assets:generate:ios": "npm run assets:prepare && capacitor-assets generate --ios"
   },
   "eslintConfig": {
     "extends": [
@@ -60,6 +61,7 @@
     ]
   },
   "devDependencies": {
-    "@capacitor/assets": "^3.0.5"
+    "@capacitor/assets": "^3.0.5",
+    "sharp": "^0.32.6"
   }
 }

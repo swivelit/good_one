@@ -73,7 +73,12 @@ export default function Navbar() {
                   <Link className="native-icon-button" to="/chat" aria-label="Messages">
                     <i className="bi bi-chat-dots"></i>
                   </Link>
-                  <Link className="native-icon-button" to="/profile" aria-label="Profile">
+                  <Link
+                    className="native-icon-button"
+                    to="/profile"
+                    aria-label="Profile"
+                    title="Profile"
+                  >
                     <i className="bi bi-person-circle"></i>
                   </Link>
                   <button
@@ -226,6 +231,11 @@ export default function Navbar() {
                     </Link>
                   </li>
                 )}
+                <li className="nav-item">
+                  <Link className="nav-link" to="/profile">
+                    <i className="bi bi-person-circle me-1"></i>Profile
+                  </Link>
+                </li>
                 <li className="nav-item dropdown">
                   <a
                     className="nav-link dropdown-toggle d-flex align-items-center gap-2"

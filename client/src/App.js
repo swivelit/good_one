@@ -64,6 +64,7 @@ function AppRoutes() {
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/account-deletion" element={<AccountDeletionPage />} />
         <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+        <Route path="/account" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
         <Route path="/chat" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
         <Route path="/chat/:conversationId" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
         <Route path="/dashboard" element={<PrivateRoute role="vendor"><VendorDashboard /></PrivateRoute>} />

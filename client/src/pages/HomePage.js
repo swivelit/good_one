@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import "../App.css";
 import CountUp from "react-countup";
 import { getUploadUrl } from "../config";
+import { useAuth } from "../AuthContext";
 
 const CATEGORIES = [
   "All",
@@ -28,6 +29,7 @@ const EMPTY_STATS = {
 };
 
 export default function HomePage() {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const search = (searchParams.get("search") || "").trim();
@@ -245,6 +247,19 @@ export default function HomePage() {
       {/* Products */}
       <section className="py-5">
         <div className="container">
+          {user?.role === "customer" && (
+            <div className="customer-profile-prompt mb-4">
+              <div className="customer-profile-copy">
+                <span>Account</span>
+                <strong>Keep your contact details current</strong>
+                <small>Name and phone updates are available in your profile.</small>
+              </div>
+              <Link className="btn btn-primary-custom btn-sm" to="/profile">
+                <i className="bi bi-person-circle me-1"></i>My Profile
+              </Link>
+            </div>
+          )}
+
           {search && (
             <div className="alert alert-warning d-flex align-items-center gap-2 mb-4">
               <i className="bi bi-search"></i>

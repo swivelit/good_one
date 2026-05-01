@@ -52,9 +52,9 @@ export default function ProfilePage() {
         <div className="profile-card-header">
           <div>
             <span className="text-uppercase small fw-bold text-muted">Account</span>
-            <h1 className="h4 fw-bold mb-1">Profile</h1>
+            <h1 className="h4 fw-bold mb-1">My Profile</h1>
             <p className="text-muted mb-0">
-              Manage your personal account details used across GoodOne.
+              Update your name and contact number. Your email is read-only.
             </p>
           </div>
           <div className="profile-avatar">
