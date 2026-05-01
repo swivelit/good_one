@@ -1,1 +1,12 @@
 .DS_Store
+dist/
+*.apk
+*.aab
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example
+!**/.env.example
+!client/.env.production.example
+client/android/key.properties

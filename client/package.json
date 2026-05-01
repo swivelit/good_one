@@ -38,7 +38,7 @@
     "cap:android": "npm run cap:sync:android && cap open android",
     "cap:ios": "npm run cap:sync:ios && cap open ios",
     "assets:prepare": "node scripts/generate-app-icons-from-logo.js",
-    "assets:generate": "npm run assets:prepare && capacitor-assets generate",
+    "assets:generate": "npm run assets:prepare && capacitor-assets generate --android --ios",
     "assets:generate:android": "npm run assets:prepare && capacitor-assets generate --android",
     "assets:generate:ios": "npm run assets:prepare && capacitor-assets generate --ios"
   },

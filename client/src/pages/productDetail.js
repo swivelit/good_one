@@ -15,7 +15,7 @@ function getTimeLeft(expiresAt) {
   return { text: `${h}h left`, cls: "success" };
 }
 
-const PLACEHOLDER = "/logo512.png";
+const PLACEHOLDER = "/assets/icons/product-placeholder.png";
 
 export default function ProductDetail() {
   const { id } = useParams();
