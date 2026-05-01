@@ -73,6 +73,9 @@ export default function Navbar() {
                   <Link className="native-icon-button" to="/chat" aria-label="Messages">
                     <i className="bi bi-chat-dots"></i>
                   </Link>
+                  <Link className="native-icon-button" to="/profile" aria-label="Profile">
+                    <i className="bi bi-person-circle"></i>
+                  </Link>
                   <button
                     type="button"
                     className="native-icon-button"
@@ -126,6 +129,10 @@ export default function Navbar() {
             <Link to="/chat" className={location.pathname.startsWith("/chat") ? "active" : ""}>
               <i className="bi bi-chat-dots"></i>
               <span>Chat</span>
+            </Link>
+            <Link to="/profile" className={location.pathname === "/profile" ? "active" : ""}>
+              <i className="bi bi-person-circle"></i>
+              <span>Profile</span>
             </Link>
           </nav>
         )}
@@ -248,6 +255,11 @@ export default function Navbar() {
                       <span className="dropdown-item-text text-muted small px-3 pt-2">
                         {user.role?.toUpperCase()}
                       </span>
+                    </li>
+                    <li>
+                      <Link className="dropdown-item" to="/profile" style={{ color: "#0d6efd" }}>
+                        <i className="bi bi-person-circle me-2"></i>Profile
+                      </Link>
                     </li>
                     <li>
                       <hr className="dropdown-divider my-1" />

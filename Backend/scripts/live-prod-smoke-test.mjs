@@ -44,6 +44,10 @@ function logPass(label) {
   console.log(`✅ ${label}`);
 }
 
+function logWarn(label, message) {
+  console.warn(`⚠️ ${label}: ${message}`);
+}
+
 function assert(condition, message) {
   if (!condition) {
     throw new SmokeTestError(message, latestResponseContext || {});
@@ -341,7 +345,40 @@ async function main() {
     firstProductId = getId(data.products[0]);
   });
 
-  await runCheck("19 Product detail", async () => {
+  await runCheck("19 Owner vendor views", async () => {
+    const mine = await requestJson(
+      "/products/my-products",
+      { method: "GET", headers: authHeaders(vendorToken) },
+      [200]
+    );
+    const ownedProductId = getId(mine?.products?.[0]);
+
+    if (!ownedProductId) {
+      logWarn(activeCheckLabel, "Skipped because the smoke-test vendor has no products.");
+      return;
+    }
+
+    const first = await requestJson(
+      `/products/${encodeURIComponent(ownedProductId)}`,
+      { method: "GET", headers: authHeaders(vendorToken) },
+      [200]
+    );
+    const firstViews = readViews(first?.product);
+
+    const second = await requestJson(
+      `/products/${encodeURIComponent(ownedProductId)}`,
+      { method: "GET", headers: authHeaders(vendorToken) },
+      [200]
+    );
+    const secondViews = readViews(second?.product);
+
+    assert(
+      secondViews === firstViews,
+      `Owner vendor product detail changed views from ${firstViews} to ${secondViews}.`
+    );
+  });
+
+  await runCheck("20 Product detail", async () => {
     if (!firstProductId) return;
 
     const data = await requestJson(
@@ -352,7 +389,7 @@ async function main() {
     assert(data?.success === true, "Product detail did not return success true.");
   });
 
-  await runCheck("20 Product detail unique guest views", async () => {
+  await runCheck("21 Product detail unique guest views", async () => {
     if (!firstProductId) return;
 
     const viewerId = `prod-smoke-${Date.now()}`;

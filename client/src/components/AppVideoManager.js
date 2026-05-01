@@ -3,15 +3,111 @@ import { Capacitor } from "@capacitor/core";
 
 const INTRO_TIMEOUT_MS = 4000;
 const POPUP_DELAY_MS = 120000;
+const POSITION_KEY = "goodone_floating_video_position";
+const EDGE_GAP = 12;
+const DEFAULT_BOTTOM_OFFSET = 90;
 const PUBLIC_URL = (process.env.PUBLIC_URL || "").replace(/\/$/, "");
 const VIDEO_SRC = `${PUBLIC_URL}/media/goodone-intro.mp4`;
+
+const getWindowSize = () => ({
+  width: window.visualViewport?.width || window.innerWidth,
+  height: window.visualViewport?.height || window.innerHeight,
+});
+
+const getSafeAreaInsets = () => {
+  if (typeof document === "undefined") return { top: 0, right: 0, bottom: 0, left: 0 };
+
+  const probe = document.createElement("div");
+  probe.style.cssText = [
+    "position:fixed",
+    "visibility:hidden",
+    "pointer-events:none",
+    "padding-top:env(safe-area-inset-top)",
+    "padding-right:env(safe-area-inset-right)",
+    "padding-bottom:env(safe-area-inset-bottom)",
+    "padding-left:env(safe-area-inset-left)",
+  ].join(";");
+  document.body.appendChild(probe);
+  const styles = window.getComputedStyle(probe);
+  const insets = {
+    top: parseFloat(styles.paddingTop) || 0,
+    right: parseFloat(styles.paddingRight) || 0,
+    bottom: parseFloat(styles.paddingBottom) || 0,
+    left: parseFloat(styles.paddingLeft) || 0,
+  };
+  probe.remove();
+  return insets;
+};
 
 export default function AppVideoManager() {
   const isNative = Capacitor.isNativePlatform();
   const [showSplash, setShowSplash] = useState(isNative);
   const [showFloating, setShowFloating] = useState(false);
+  const [floatingPosition, setFloatingPosition] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
   const splashTimerRef = useRef(null);
   const popupTimerRef = useRef(null);
+  const widgetRef = useRef(null);
+  const dragRef = useRef(null);
+
+  const getWidgetSize = useCallback(() => {
+    const rect = widgetRef.current?.getBoundingClientRect();
+    if (rect?.width && rect?.height) {
+      return { width: rect.width, height: rect.height };
+    }
+
+    const { width } = getWindowSize();
+    const widgetWidth = Math.min(Math.max(width * 0.18, 64), 110);
+    return { width: widgetWidth, height: widgetWidth * (16 / 9) };
+  }, []);
+
+  const clampPosition = useCallback((position) => {
+    const { width: viewportWidth, height: viewportHeight } = getWindowSize();
+    const { width, height } = getWidgetSize();
+    const safe = getSafeAreaInsets();
+
+    const minLeft = EDGE_GAP + safe.left;
+    const minTop = EDGE_GAP + safe.top;
+    const maxLeft = Math.max(minLeft, viewportWidth - width - EDGE_GAP - safe.right);
+    const maxTop = Math.max(minTop, viewportHeight - height - EDGE_GAP - safe.bottom);
+
+    return {
+      left: Math.min(Math.max(position.left, minLeft), maxLeft),
+      top: Math.min(Math.max(position.top, minTop), maxTop),
+    };
+  }, [getWidgetSize]);
+
+  const getDefaultPosition = useCallback(() => {
+    const { width: viewportWidth, height: viewportHeight } = getWindowSize();
+    const { width, height } = getWidgetSize();
+    const safe = getSafeAreaInsets();
+
+    return clampPosition({
+      left: viewportWidth - width - EDGE_GAP - safe.right,
+      top: viewportHeight - height - DEFAULT_BOTTOM_OFFSET - safe.bottom,
+    });
+  }, [clampPosition, getWidgetSize]);
+
+  const savePosition = useCallback((position) => {
+    try {
+      localStorage.setItem(POSITION_KEY, JSON.stringify(position));
+    } catch (error) {
+      // Ignore private-mode storage failures; the default position still works.
+    }
+  }, []);
+
+  const loadPosition = useCallback(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(POSITION_KEY));
+      if (Number.isFinite(saved?.left) && Number.isFinite(saved?.top)) {
+        return clampPosition(saved);
+      }
+    } catch (error) {
+      // Ignore malformed saved positions.
+    }
+
+    return getDefaultPosition();
+  }, [clampPosition, getDefaultPosition]);
 
   const clearPopupTimer = useCallback(() => {
     if (popupTimerRef.current) {
@@ -36,10 +132,59 @@ export default function AppVideoManager() {
     popupTimerRef.current = setTimeout(() => {
       popupTimerRef.current = null;
       if (document.visibilityState === "visible") {
+        setFloatingPosition(loadPosition());
         setShowFloating(true);
       }
     }, POPUP_DELAY_MS);
-  }, [clearPopupTimer, isNative, showFloating, showSplash]);
+  }, [clearPopupTimer, isNative, loadPosition, showFloating, showSplash]);
+
+  const handleCloseFloating = useCallback((event) => {
+    event.stopPropagation();
+    clearPopupTimer();
+    setShowFloating(false);
+    setIsDragging(false);
+    dragRef.current = null;
+  }, [clearPopupTimer]);
+
+  const handlePointerDown = useCallback((event) => {
+    if (!floatingPosition || event.button > 0) return;
+
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: floatingPosition.left,
+      startTop: floatingPosition.top,
+    };
+    setIsDragging(true);
+  }, [floatingPosition]);
+
+  const handlePointerMove = useCallback((event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    event.preventDefault();
+    const nextPosition = clampPosition({
+      left: drag.startLeft + event.clientX - drag.startX,
+      top: drag.startTop + event.clientY - drag.startY,
+    });
+    setFloatingPosition(nextPosition);
+  }, [clampPosition]);
+
+  const finishDrag = useCallback((event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    dragRef.current = null;
+    setIsDragging(false);
+    setFloatingPosition((current) => {
+      const clamped = clampPosition(current || getDefaultPosition());
+      savePosition(clamped);
+      return clamped;
+    });
+  }, [clampPosition, getDefaultPosition, savePosition]);
 
   useEffect(() => {
     if (!isNative) return undefined;
@@ -80,6 +225,28 @@ export default function AppVideoManager() {
     };
   }, [clearPopupTimer, isNative, scheduleFloatingPopup, showFloating, showSplash]);
 
+  useEffect(() => {
+    if (!isNative) return undefined;
+
+    const handleResize = () => {
+      setFloatingPosition((current) => {
+        if (!current) return current;
+        const clamped = clampPosition(current);
+        savePosition(clamped);
+        return clamped;
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    window.visualViewport?.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
+      window.visualViewport?.removeEventListener("resize", handleResize);
+    };
+  }, [clampPosition, isNative, savePosition]);
+
   if (!isNative) return null;
 
   return (
@@ -98,12 +265,25 @@ export default function AppVideoManager() {
       )}
 
       {!showSplash && showFloating && (
-        <div className="floating-video-widget">
+        <div
+          ref={widgetRef}
+          className={`floating-video-widget ${isDragging ? "dragging" : ""}`}
+          style={
+            floatingPosition
+              ? { left: `${floatingPosition.left}px`, top: `${floatingPosition.top}px` }
+              : undefined
+          }
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishDrag}
+          onPointerCancel={finishDrag}
+        >
           <button
             type="button"
             className="floating-video-close"
             aria-label="Close video"
-            onClick={() => setShowFloating(false)}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={handleCloseFloating}
           >
             <i className="bi bi-x"></i>
           </button>

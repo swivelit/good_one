@@ -36,7 +36,10 @@
     "cap:sync:android": "npm run build && cap sync android",
     "cap:sync:ios": "npm run build && cap sync ios",
     "cap:android": "npm run cap:sync:android && cap open android",
-    "cap:ios": "npm run cap:sync:ios && cap open ios"
+    "cap:ios": "npm run cap:sync:ios && cap open ios",
+    "assets:generate": "capacitor-assets generate",
+    "assets:generate:android": "capacitor-assets generate --android",
+    "assets:generate:ios": "capacitor-assets generate --ios"
   },
   "eslintConfig": {
     "extends": [
@@ -55,5 +58,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5"
   }
 }

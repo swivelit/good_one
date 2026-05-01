@@ -31,6 +31,10 @@ jest.mock('react-router-dom', () => {
   };
 }, { virtual: true });
 
+beforeEach(() => {
+  Capacitor.isNativePlatform.mockReturnValue(false);
+});
+
 test('renders GoodOne app shell', () => {
   render(<App />);
   expect(screen.getAllByText(/GoodOne/i).length).toBeGreaterThan(0);

@@ -50,6 +50,7 @@ export const authAPI = {
   registerVendor: (data) => API.post('/auth/register/vendor', data),
   login: (data) => API.post('/auth/login', data),
   getMe: () => API.get('/auth/me'),
+  updateMe: (data) => API.put('/auth/me', data),
   deleteMe: () => API.delete('/auth/me'),
 };
 

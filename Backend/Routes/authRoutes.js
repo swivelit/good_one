@@ -6,6 +6,7 @@ const {
   registerVendor,
   login,
   getMe,
+  updateMe,
   deleteMe,
 } = require('../Controllers/authController');
 
@@ -48,6 +49,7 @@ router.post(
 router.post('/login', login);
 
 router.get('/me', protect, getMe);
+router.put('/me', protect, updateMe);
 router.delete('/me', protect, deleteMe);
 
 module.exports = router;

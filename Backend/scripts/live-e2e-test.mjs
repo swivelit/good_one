@@ -352,7 +352,25 @@ async function main() {
       assert(data?.user?.email === customerEmail, "Customer getMe returned the wrong email.");
     });
 
-    await runCheck("14 Vendor send OTP", async () => {
+    await runCheck("14 Customer profile update", async () => {
+      const updatedName = `Updated Customer ${RUN_ID}`;
+      const updatedPhone = makeUniquePhone("702");
+      const data = await requestJson(
+        "/auth/me",
+        {
+          method: "PUT",
+          headers: authHeaders(state.customerToken),
+          body: { name: updatedName, phone: updatedPhone },
+        },
+        [200]
+      );
+      assert(data?.success === true, "Customer profile update did not return success true.");
+      assert(data?.user?.name === updatedName, "Customer profile update did not return the updated name.");
+      assert(data?.user?.phone === updatedPhone, "Customer profile update did not return the updated phone.");
+      assert(data?.user?.role === "customer", "Customer profile update changed the user role.");
+    });
+
+    await runCheck("15 Vendor send OTP", async () => {
       const data = await requestJson(
         "/sendOtp",
         { method: "POST", body: { email: vendorEmail } },
@@ -362,7 +380,7 @@ async function main() {
       assert(data?.testOtpEnabled === true, "Vendor send OTP did not report testOtpEnabled true.");
     });
 
-    await runCheck("15 Vendor register", async () => {
+    await runCheck("16 Vendor register", async () => {
       const form = new FormData();
       form.append("name", `E2E Vendor ${RUN_ID}`);
       form.append("email", vendorEmail);
@@ -389,7 +407,7 @@ async function main() {
       assert(Boolean(data?.vendor), "Vendor register did not return a vendor object.");
     });
 
-    await runCheck("16 Vendor login", async () => {
+    await runCheck("17 Vendor login", async () => {
       const data = await requestJson(
         "/auth/login",
         { method: "POST", body: { emailOrPhone: vendorEmail, password: PASSWORD } },
@@ -402,7 +420,7 @@ async function main() {
       assert(Boolean(data?.vendorProfile), "Vendor login did not return vendorProfile.");
     });
 
-    await runCheck("17 Vendor create product", async () => {
+    await runCheck("18 Vendor create product", async () => {
       const form = new FormData();
       form.append("title", `E2E Product ${RUN_ID}`);
       form.append("description", "Automated live E2E product listing");
@@ -425,7 +443,28 @@ async function main() {
       assert(Boolean(productId), "Product create did not return a product id.");
     });
 
-    await runCheck("18 Product list/detail", async () => {
+    await runCheck("19 Vendor self views do not increment", async () => {
+      const first = await requestJson(
+        `/products/${encodeURIComponent(productId)}`,
+        { method: "GET", headers: authHeaders(state.vendorToken) },
+        [200]
+      );
+      const firstViews = readViews(first?.product);
+
+      for (let i = 0; i < 3; i += 1) {
+        const next = await requestJson(
+          `/products/${encodeURIComponent(productId)}`,
+          { method: "GET", headers: authHeaders(state.vendorToken) },
+          [200]
+        );
+        assert(
+          readViews(next?.product) === firstViews,
+          `Owner vendor view changed views from ${firstViews} to ${readViews(next?.product)}.`
+        );
+      }
+    });
+
+    await runCheck("20 Product list/detail", async () => {
       const list = await requestJson("/products", { method: "GET" }, [200]);
       assert(list?.success === true, "Product list did not return success true.");
       assert(Array.isArray(list?.products), "Product list did not return a products array.");
@@ -436,7 +475,7 @@ async function main() {
       assert(getId(detail?.product) === productId, "Product detail returned the wrong product id.");
     });
 
-    await runCheck("19 Product search", async () => {
+    await runCheck("21 Product search", async () => {
       const data = await requestJson(`/products?search=${encodeURIComponent(RUN_ID)}`, { method: "GET" }, [200]);
       assert(data?.success === true, "Product search did not return success true.");
       assert(Array.isArray(data?.products), "Product search did not return a products array.");
@@ -446,7 +485,7 @@ async function main() {
       );
     });
 
-    await runCheck("20 Product unique guest views", async () => {
+    await runCheck("22 Product unique guest views", async () => {
       const viewerId = `live-e2e-${RUN_ID}`;
       const first = await requestJson(
         `/products/${encodeURIComponent(productId)}`,
@@ -466,14 +505,24 @@ async function main() {
         secondViews === firstViews,
         `Repeated product detail with same X-Viewer-Id changed views from ${firstViews} to ${secondViews}.`
       );
+
+      const third = await requestJson(
+        `/products/${encodeURIComponent(productId)}`,
+        { method: "GET", headers: { "X-Viewer-Id": `${viewerId}-other` } },
+        [200]
+      );
+      assert(
+        readViews(third?.product) >= secondViews,
+        "Different X-Viewer-Id should not reduce product views."
+      );
     });
 
-    await runCheck("21 Uploaded image loads", async () => {
+    await runCheck("23 Uploaded image loads", async () => {
       assert(Boolean(productImage), "Product did not include an uploaded image filename.");
       await requestRawUrl(uploadedImageUrl(productImage), { method: "GET" }, [200]);
     });
 
-    await runCheck("22 Customer creates conversation", async () => {
+    await runCheck("24 Customer creates conversation", async () => {
       const data = await requestJson(
         "/chat/conversation",
         {
@@ -488,7 +537,7 @@ async function main() {
       assert(Boolean(conversationId), "Create conversation did not return a conversation id.");
     });
 
-    await runCheck("23 Messaging", async () => {
+    await runCheck("25 Messaging", async () => {
       const customerMessage = await requestJson(
         `/chat/${encodeURIComponent(conversationId)}/messages`,
         {
@@ -521,7 +570,7 @@ async function main() {
       assert(messages.messages.length >= 2, "Get messages returned fewer than 2 messages.");
     });
 
-    await runCheck("24 Report listing", async () => {
+    await runCheck("26 Report listing", async () => {
       const data = await requestJson(
         "/reports",
         {
@@ -539,7 +588,7 @@ async function main() {
       assert(data?.success === true, "Listing report did not return success true.");
     });
 
-    await runCheck("25 Report conversation", async () => {
+    await runCheck("27 Report conversation", async () => {
       const data = await requestJson(
         "/reports",
         {
@@ -557,7 +606,7 @@ async function main() {
       assert(data?.success === true, "Conversation report did not return success true.");
     });
 
-    await runCheck("26 Block user", async () => {
+    await runCheck("28 Block user", async () => {
       const data = await requestJson(
         "/blocks",
         {
@@ -573,7 +622,7 @@ async function main() {
       assert(data?.success === true, "Block user did not return success true.");
     });
 
-    await runCheck("27 Block prevents further message", async () => {
+    await runCheck("29 Block prevents further message", async () => {
       const data = await requestJson(
         `/chat/${encodeURIComponent(conversationId)}/messages`,
         {
@@ -586,7 +635,7 @@ async function main() {
       assert(data?.success === false, "Blocked message did not return success false.");
     });
 
-    await runCheck("28 Account deletion cleanup", async () => {
+    await runCheck("30 Account deletion cleanup", async () => {
       const customerDelete = await requestJson(
         "/auth/me",
         { method: "DELETE", headers: authHeaders(state.customerToken) },
@@ -604,7 +653,7 @@ async function main() {
       state.vendorDeleted = true;
     });
 
-    await runCheck("29 Verify deleted login fails", async () => {
+    await runCheck("31 Verify deleted login fails", async () => {
       const customerLogin = await requestJson(
         "/auth/login",
         { method: "POST", body: { emailOrPhone: customerEmail, password: PASSWORD } },

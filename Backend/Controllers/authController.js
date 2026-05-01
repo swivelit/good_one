@@ -259,6 +259,49 @@ exports.getMe = async (req, res) => {
   }
 };
 
+exports.updateMe = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const name = String(req.body.name || '').trim();
+    const phone =
+      req.body.phone === undefined || req.body.phone === null
+        ? undefined
+        : String(req.body.phone).trim();
+
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Name is required.' });
+    }
+
+    if (phone) {
+      const existingPhoneUser = await prisma.user.findFirst({
+        where: {
+          phone,
+          NOT: { id: userId },
+        },
+      });
+
+      if (existingPhoneUser) {
+        return res.status(400).json({ success: false, message: 'Phone number is already in use.' });
+      }
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name,
+        ...(phone !== undefined ? { phone: phone || null } : {}),
+      },
+    });
+
+    res.json({
+      success: true,
+      user: sanitizeUser(user),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.deleteMe = async (req, res) => {
   try {
     const userId = req.user.id;

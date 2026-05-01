@@ -17,6 +17,7 @@ const productInclude = {
       totalReviews: true,
       businessDescription: true,
       businessAddress: true,
+      userId: true,
     },
   },
 };
@@ -187,7 +188,9 @@ exports.getProduct = async (req, res) => {
 
     let productForResponse = product;
     const userId = req.user?.id;
-    const isOwnerView = userId && product.vendorUserId === userId;
+    const isOwnerView =
+      Boolean(userId) &&
+      (product.vendorUserId === userId || product.vendor?.userId === userId);
     const isViewCountEligible = product.isActive && new Date(product.expiresAt) > new Date();
 
     if (isViewCountEligible && !isOwnerView) {
