@@ -227,6 +227,9 @@ export default function AppVideoManager() {
       if (document.visibilityState === "hidden") {
         clearPopupTimer();
         setShowFloating(false);
+        setIsExpanded(false);
+        setIsDragging(false);
+        dragRef.current = null;
         return;
       }
 
