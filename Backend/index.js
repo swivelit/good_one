@@ -12,7 +12,15 @@ const { sanitizeUser } = require('./utils/serialize');
 const app = express();
 const server = http.createServer(app);
 
-const defaultOrigins = ['http://localhost:3000', 'http://localhost:3001'];
+const defaultOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost',
+  'https://localhost',
+  'capacitor://localhost',
+  'ionic://localhost',
+  'https://good-one-jlcu.onrender.com',
+];
 const envOrigins = (process.env.CLIENT_URLS || '')
   .split(',')
   .map((s) => s.trim())

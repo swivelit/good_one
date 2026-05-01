@@ -1,12 +1,23 @@
 const prisma = require('../Db/prisma');
 const { toCompat } = require('../utils/serialize');
 
+const isUuid = (value) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    String(value || '')
+  );
+
 exports.blockUser = async (req, res) => {
   try {
     const { blockedUser, conversation } = req.body;
 
     if (!blockedUser) {
       return res.status(400).json({ success: false, message: 'Blocked user is required.' });
+    }
+    if (!isUuid(blockedUser)) {
+      return res.status(400).json({ success: false, message: 'Invalid blocked user id.' });
+    }
+    if (conversation && !isUuid(conversation)) {
+      return res.status(400).json({ success: false, message: 'Invalid conversation id.' });
     }
 
     if (blockedUser.toString() === req.user.id) {

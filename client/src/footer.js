@@ -12,7 +12,7 @@ export default function Footer() {
               <i className="bi bi-shop-window me-2"></i>GoodOne
             </h5>
             <p className="small">
-              The simplest way to buy and sell locally. Connect directly with verified vendors, negotiate prices, and arrange meet-ups safely.
+              The simplest way to buy and sell locally. Connect directly with registered vendors, negotiate prices, and arrange meet-ups safely.
             </p>
             <div className="d-flex gap-3 mt-3">
               {['facebook','twitter','instagram','linkedin'].map(s => (
@@ -23,7 +23,7 @@ export default function Footer() {
           <div className="col-lg-2 col-md-6 col-6">
             <h6 className="fw-bold mb-3">Platform</h6>
             <ul className="list-unstyled small">
-              <li className="mb-2"><Link to="/" className=" text-decoration-none">Browse Products</Link></li>
+              <li className="mb-2"><Link to="/browse" className=" text-decoration-none">Browse Products</Link></li>
               <li className="mb-2"><Link to="/register/vendor" className="text-decoration-none">Become a Vendor</Link></li>
               <li className="mb-2"><Link to="/register/customer" className=" text-decoration-none">Sign Up Free</Link></li>
             </ul>
@@ -42,7 +42,7 @@ export default function Footer() {
             <h6 className="fw-bold mb-3">How It Works</h6>
             <div className="d-flex gap-2 mb-2 small ">
               <i className="bi bi-1-circle-fill text-warning mt-1"></i>
-              <span>Browse products from verified vendors</span>
+              <span>Browse products from registered vendors</span>
             </div>
             <div className="d-flex gap-2 mb-2 small ">
               <i className="bi bi-2-circle-fill text-warning mt-1"></i>

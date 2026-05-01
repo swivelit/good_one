@@ -128,7 +128,7 @@ export default function RegisterCustomer() {
           <i className="bi bi-person-plus display-5 mb-2 d-block"></i>
           <h4 className="fw-bold mb-1">Create Customer Account</h4>
           <p className="opacity-80 mb-0 small">
-            Shop from verified vendors directly
+            Shop from registered vendors directly
           </p>
         </div>
 

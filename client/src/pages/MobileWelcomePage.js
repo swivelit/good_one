@@ -11,7 +11,7 @@ export default function MobileWelcomePage() {
           </div>
           <h1 className="h3 fw-bold mb-2">GoodOne</h1>
           <p className="opacity-80 mb-0">
-            Buy & sell directly with verified local vendors
+            Buy & sell directly with registered local vendors
           </p>
         </div>
 

@@ -13,6 +13,7 @@ const vendorEmail = `e2e-vendor-${RUN_ID}@example.com`;
 const customerPhone = makeUniquePhone("700");
 const vendorPhone = makeUniquePhone("701");
 const backendOrigin = new URL(API_BASE_URL).origin;
+const frontendOrigin = FRONTEND_URL.replace(/\/+$/, "");
 const pngBytes = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
   "base64"
@@ -158,6 +159,18 @@ function getId(value) {
   return value?.id || value?._id;
 }
 
+function readViews(product) {
+  return Number(product?.views || 0);
+}
+
+function assertCorsAllowed(response, origin) {
+  const allowedOrigin = response.headers.get("access-control-allow-origin");
+  assert(
+    allowedOrigin === origin || allowedOrigin === "*",
+    `CORS did not allow ${origin}. Received Access-Control-Allow-Origin: ${allowedOrigin || "<missing>"}`
+  );
+}
+
 function uploadedImageUrl(fileName) {
   if (/^https?:\/\//i.test(fileName)) return fileName;
   return `${backendOrigin}/uploads/${encodeURIComponent(fileName)}`;
@@ -231,8 +244,28 @@ async function main() {
       assert(data?.status === "OK", "Backend health did not return status OK.");
     });
 
-    await runCheck("03 Frontend homepage", async () => {
-      const response = await requestRawUrl(FRONTEND_URL, { method: "GET" }, [200]);
+    await runCheck("03 Public stats", async () => {
+      const data = await requestJson("/stats/public", { method: "GET" }, [200]);
+      assert(data?.success === true, "Public stats did not return success true.");
+      assert(typeof data?.stats?.activeListings === "number", "Public stats missing activeListings number.");
+      assert(typeof data?.stats?.registeredVendors === "number", "Public stats missing registeredVendors number.");
+      assert(typeof data?.stats?.registeredBuyers === "number", "Public stats missing registeredBuyers number.");
+      assert(typeof data?.stats?.totalRenewals === "number", "Public stats missing totalRenewals number.");
+    });
+
+    await runCheck("04 Native CORS origins", async () => {
+      for (const origin of ["capacitor://localhost", "ionic://localhost", "http://localhost", "https://localhost"]) {
+        const response = await requestRawUrl(
+          `${API_BASE_URL.replace(/\/+$/, "")}/health`,
+          { method: "GET", headers: { Origin: origin } },
+          [200]
+        );
+        assertCorsAllowed(response, origin);
+      }
+    });
+
+    await runCheck("05 Frontend homepage", async () => {
+      const response = await requestRawUrl(frontendOrigin, { method: "GET" }, [200]);
       const body = await response.text();
       rememberResponse(activeCheckLabel, response.status, body);
       assert(
@@ -241,36 +274,32 @@ async function main() {
       );
     });
 
-    await runCheck("04 Frontend login direct route", async () => {
-      await requestRawUrl(`${FRONTEND_URL.replace(/\/+$/, "")}/login`, { method: "GET" }, [200]);
+    await runCheck("06 Frontend login direct route", async () => {
+      await requestRawUrl(`${frontendOrigin}/login`, { method: "GET" }, [200]);
     });
 
-    await runCheck("05 Frontend privacy direct route", async () => {
-      await requestRawUrl(`${FRONTEND_URL.replace(/\/+$/, "")}/privacy`, { method: "GET" }, [200]);
+    await runCheck("07 Frontend privacy direct route", async () => {
+      await requestRawUrl(`${frontendOrigin}/privacy`, { method: "GET" }, [200]);
     });
 
-    await runCheck("06 Frontend account deletion direct route", async () => {
+    await runCheck("08 Frontend account deletion direct route", async () => {
       await requestRawUrl(
-        `${FRONTEND_URL.replace(/\/+$/, "")}/account-deletion`,
+        `${frontendOrigin}/account-deletion`,
         { method: "GET" },
         [200]
       );
     });
 
-    await runCheck("07 CORS", async () => {
+    await runCheck("09 CORS", async () => {
       const response = await requestRawUrl(
         `${API_BASE_URL.replace(/\/+$/, "")}/health`,
-        { method: "GET", headers: { Origin: FRONTEND_URL } },
+        { method: "GET", headers: { Origin: frontendOrigin } },
         [200]
       );
-      const allowedOrigin = response.headers.get("access-control-allow-origin");
-      assert(
-        allowedOrigin === FRONTEND_URL || Boolean(allowedOrigin),
-        "CORS response did not include Access-Control-Allow-Origin."
-      );
+      assertCorsAllowed(response, frontendOrigin);
     });
 
-    await runCheck("08 Customer send OTP", async () => {
+    await runCheck("10 Customer send OTP", async () => {
       const data = await requestJson(
         "/sendOtp",
         { method: "POST", body: { email: customerEmail } },
@@ -280,7 +309,7 @@ async function main() {
       assert(data?.testOtpEnabled === true, "Customer send OTP did not report testOtpEnabled true.");
     });
 
-    await runCheck("09 Customer register", async () => {
+    await runCheck("11 Customer register", async () => {
       const data = await requestJson(
         "/auth/register/customer",
         {
@@ -302,7 +331,7 @@ async function main() {
       assert(!Object.hasOwn(data?.user || {}, "password"), "Customer user included a password.");
     });
 
-    await runCheck("10 Customer login", async () => {
+    await runCheck("12 Customer login", async () => {
       const data = await requestJson(
         "/auth/login",
         { method: "POST", body: { emailOrPhone: customerEmail, password: PASSWORD } },
@@ -313,7 +342,7 @@ async function main() {
       assert(Boolean(state.customerToken), "Customer login did not return a token.");
     });
 
-    await runCheck("11 Customer getMe", async () => {
+    await runCheck("13 Customer getMe", async () => {
       const data = await requestJson(
         "/auth/me",
         { method: "GET", headers: authHeaders(state.customerToken) },
@@ -323,7 +352,7 @@ async function main() {
       assert(data?.user?.email === customerEmail, "Customer getMe returned the wrong email.");
     });
 
-    await runCheck("12 Vendor send OTP", async () => {
+    await runCheck("14 Vendor send OTP", async () => {
       const data = await requestJson(
         "/sendOtp",
         { method: "POST", body: { email: vendorEmail } },
@@ -333,7 +362,7 @@ async function main() {
       assert(data?.testOtpEnabled === true, "Vendor send OTP did not report testOtpEnabled true.");
     });
 
-    await runCheck("13 Vendor register", async () => {
+    await runCheck("15 Vendor register", async () => {
       const form = new FormData();
       form.append("name", `E2E Vendor ${RUN_ID}`);
       form.append("email", vendorEmail);
@@ -360,7 +389,7 @@ async function main() {
       assert(Boolean(data?.vendor), "Vendor register did not return a vendor object.");
     });
 
-    await runCheck("14 Vendor login", async () => {
+    await runCheck("16 Vendor login", async () => {
       const data = await requestJson(
         "/auth/login",
         { method: "POST", body: { emailOrPhone: vendorEmail, password: PASSWORD } },
@@ -373,7 +402,7 @@ async function main() {
       assert(Boolean(data?.vendorProfile), "Vendor login did not return vendorProfile.");
     });
 
-    await runCheck("15 Vendor create product", async () => {
+    await runCheck("17 Vendor create product", async () => {
       const form = new FormData();
       form.append("title", `E2E Product ${RUN_ID}`);
       form.append("description", "Automated live E2E product listing");
@@ -396,7 +425,7 @@ async function main() {
       assert(Boolean(productId), "Product create did not return a product id.");
     });
 
-    await runCheck("16 Product list/detail", async () => {
+    await runCheck("18 Product list/detail", async () => {
       const list = await requestJson("/products", { method: "GET" }, [200]);
       assert(list?.success === true, "Product list did not return success true.");
       assert(Array.isArray(list?.products), "Product list did not return a products array.");
@@ -407,12 +436,44 @@ async function main() {
       assert(getId(detail?.product) === productId, "Product detail returned the wrong product id.");
     });
 
-    await runCheck("17 Uploaded image loads", async () => {
+    await runCheck("19 Product search", async () => {
+      const data = await requestJson(`/products?search=${encodeURIComponent(RUN_ID)}`, { method: "GET" }, [200]);
+      assert(data?.success === true, "Product search did not return success true.");
+      assert(Array.isArray(data?.products), "Product search did not return a products array.");
+      assert(
+        data.products.some((product) => getId(product) === productId),
+        "Product search did not include the created product."
+      );
+    });
+
+    await runCheck("20 Product unique guest views", async () => {
+      const viewerId = `live-e2e-${RUN_ID}`;
+      const first = await requestJson(
+        `/products/${encodeURIComponent(productId)}`,
+        { method: "GET", headers: { "X-Viewer-Id": viewerId } },
+        [200]
+      );
+      const firstViews = readViews(first?.product);
+
+      const second = await requestJson(
+        `/products/${encodeURIComponent(productId)}`,
+        { method: "GET", headers: { "X-Viewer-Id": viewerId } },
+        [200]
+      );
+      const secondViews = readViews(second?.product);
+
+      assert(
+        secondViews === firstViews,
+        `Repeated product detail with same X-Viewer-Id changed views from ${firstViews} to ${secondViews}.`
+      );
+    });
+
+    await runCheck("21 Uploaded image loads", async () => {
       assert(Boolean(productImage), "Product did not include an uploaded image filename.");
       await requestRawUrl(uploadedImageUrl(productImage), { method: "GET" }, [200]);
     });
 
-    await runCheck("18 Customer creates conversation", async () => {
+    await runCheck("22 Customer creates conversation", async () => {
       const data = await requestJson(
         "/chat/conversation",
         {
@@ -427,7 +488,7 @@ async function main() {
       assert(Boolean(conversationId), "Create conversation did not return a conversation id.");
     });
 
-    await runCheck("19 Messaging", async () => {
+    await runCheck("23 Messaging", async () => {
       const customerMessage = await requestJson(
         `/chat/${encodeURIComponent(conversationId)}/messages`,
         {
@@ -460,7 +521,7 @@ async function main() {
       assert(messages.messages.length >= 2, "Get messages returned fewer than 2 messages.");
     });
 
-    await runCheck("20 Report listing", async () => {
+    await runCheck("24 Report listing", async () => {
       const data = await requestJson(
         "/reports",
         {
@@ -478,7 +539,7 @@ async function main() {
       assert(data?.success === true, "Listing report did not return success true.");
     });
 
-    await runCheck("21 Report conversation", async () => {
+    await runCheck("25 Report conversation", async () => {
       const data = await requestJson(
         "/reports",
         {
@@ -496,7 +557,7 @@ async function main() {
       assert(data?.success === true, "Conversation report did not return success true.");
     });
 
-    await runCheck("22 Block user", async () => {
+    await runCheck("26 Block user", async () => {
       const data = await requestJson(
         "/blocks",
         {
@@ -512,7 +573,7 @@ async function main() {
       assert(data?.success === true, "Block user did not return success true.");
     });
 
-    await runCheck("23 Block prevents further message", async () => {
+    await runCheck("27 Block prevents further message", async () => {
       const data = await requestJson(
         `/chat/${encodeURIComponent(conversationId)}/messages`,
         {
@@ -525,7 +586,7 @@ async function main() {
       assert(data?.success === false, "Blocked message did not return success false.");
     });
 
-    await runCheck("24 Account deletion cleanup", async () => {
+    await runCheck("28 Account deletion cleanup", async () => {
       const customerDelete = await requestJson(
         "/auth/me",
         { method: "DELETE", headers: authHeaders(state.customerToken) },
@@ -543,7 +604,7 @@ async function main() {
       state.vendorDeleted = true;
     });
 
-    await runCheck("25 Verify deleted login fails", async () => {
+    await runCheck("29 Verify deleted login fails", async () => {
       const customerLogin = await requestJson(
         "/auth/login",
         { method: "POST", body: { emailOrPhone: customerEmail, password: PASSWORD } },

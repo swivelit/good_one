@@ -278,7 +278,7 @@ export default function RegisterVendor() {
           <i className="bi bi-shop display-5 mb-2 d-block"></i>
           <h4 className="fw-bold mb-1">Become a Vendor on GoodOne</h4>
           <p className="opacity-80 mb-0 small">
-            Verified sellers get more trust & visibility
+            Registered sellers can list products and chat with local buyers
           </p>
           <div className="d-flex justify-content-center gap-2 mt-3 flex-wrap">
             {["1. Account", "2. Live Verify", "3. OTP"].map((label, i) => (

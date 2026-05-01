@@ -1,5 +1,8 @@
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const prisma = require('../Db/prisma');
+const { uploadsDir } = require('../config/uploads');
 const { assertCleanFields } = require('../utils/contentModeration');
 const { toCompat } = require('../utils/serialize');
 
@@ -27,6 +30,10 @@ const parseTags = (tags) => {
 };
 
 const normalizeSearchTerm = (value) => String(value || '').trim().replace(/\s+/g, ' ');
+const isUuid = (value) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    String(value || '')
+  );
 
 const getHeaderValue = (value) => {
   if (Array.isArray(value)) return value[0];
@@ -40,6 +47,19 @@ const buildGuestViewerKey = (req) => {
   const fingerprint = `${req.ip || ''}|${req.headers['user-agent'] || ''}`;
   const hash = crypto.createHash('sha256').update(fingerprint).digest('hex');
   return `guest:fingerprint:${hash}`;
+};
+
+const deleteUploadedFile = async (fileName) => {
+  if (!fileName || /^https?:\/\//i.test(fileName)) return;
+
+  const filePath = path.join(uploadsDir, path.basename(fileName));
+  try {
+    await fs.promises.unlink(filePath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error(`Failed to delete uploaded file: ${path.basename(fileName)}`);
+    }
+  }
 };
 
 const productDataFromBody = (body) => {
@@ -72,6 +92,24 @@ const assertCleanProductFields = (body) => {
     location: body.location,
     tags: body.tags,
   });
+};
+
+const validateProductPricing = (body) => {
+  if (body.price !== undefined) {
+    const price = Number(body.price);
+    if (!Number.isFinite(price) || price < 0) {
+      return 'Product price must be a valid non-negative number.';
+    }
+  }
+
+  if (body.originalPrice !== undefined && body.originalPrice !== '') {
+    const originalPrice = Number(body.originalPrice);
+    if (!Number.isFinite(originalPrice) || originalPrice < 0) {
+      return 'Original price must be a valid non-negative number.';
+    }
+  }
+
+  return null;
 };
 
 exports.getProducts = async (req, res) => {
@@ -137,6 +175,10 @@ exports.getProducts = async (req, res) => {
 
 exports.getProduct = async (req, res) => {
   try {
+    if (!isUuid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid product id.' });
+    }
+
     const product = await prisma.product.findUnique({
       where: { id: req.params.id },
       include: productInclude,
@@ -146,8 +188,9 @@ exports.getProduct = async (req, res) => {
     let productForResponse = product;
     const userId = req.user?.id;
     const isOwnerView = userId && product.vendorUserId === userId;
+    const isViewCountEligible = product.isActive && new Date(product.expiresAt) > new Date();
 
-    if (!isOwnerView) {
+    if (isViewCountEligible && !isOwnerView) {
       const viewerUserId = userId || null;
       const viewerKey = viewerUserId ? `user:${viewerUserId}` : buildGuestViewerKey(req);
 
@@ -188,6 +231,10 @@ exports.createProduct = async (req, res) => {
     if (!title || !description || price === undefined || !category) {
       return res.status(400).json({ success: false, message: 'Missing required product fields.' });
     }
+    const pricingError = validateProductPricing(req.body);
+    if (pricingError) {
+      return res.status(400).json({ success: false, message: pricingError });
+    }
 
     assertCleanProductFields(req.body);
 
@@ -218,6 +265,10 @@ exports.createProduct = async (req, res) => {
 
 exports.updateProduct = async (req, res) => {
   try {
+    if (!isUuid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid product id.' });
+    }
+
     const product = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
     if (product.vendorUserId !== req.user.id) {
@@ -225,6 +276,10 @@ exports.updateProduct = async (req, res) => {
     }
 
     assertCleanProductFields(req.body);
+    const pricingError = validateProductPricing(req.body);
+    if (pricingError) {
+      return res.status(400).json({ success: false, message: pricingError });
+    }
 
     const updated = await prisma.product.update({
       where: { id: req.params.id },
@@ -241,6 +296,10 @@ exports.updateProduct = async (req, res) => {
 
 exports.renewProduct = async (req, res) => {
   try {
+    if (!isUuid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid product id.' });
+    }
+
     const product = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
     if (product.vendorUserId !== req.user.id) {
@@ -264,6 +323,10 @@ exports.renewProduct = async (req, res) => {
 
 exports.deleteProduct = async (req, res) => {
   try {
+    if (!isUuid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid product id.' });
+    }
+
     const product = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
     if (product.vendorUserId !== req.user.id) {
@@ -271,6 +334,7 @@ exports.deleteProduct = async (req, res) => {
     }
 
     await prisma.product.delete({ where: { id: req.params.id } });
+    await Promise.all((product.images || []).map(deleteUploadedFile));
 
     const vendor = await prisma.vendor.findUnique({ where: { userId: req.user.id } });
     if (vendor && vendor.totalProducts > 0) {
@@ -302,6 +366,10 @@ exports.getMyProducts = async (req, res) => {
 
 exports.getVendorProducts = async (req, res) => {
   try {
+    if (!isUuid(req.params.vendorId)) {
+      return res.status(400).json({ success: false, message: 'Invalid vendor id.' });
+    }
+
     const products = await prisma.product.findMany({
       where: {
         vendorId: req.params.vendorId,

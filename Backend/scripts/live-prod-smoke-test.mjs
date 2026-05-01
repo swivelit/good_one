@@ -166,6 +166,18 @@ function emailsMatch(actual, expected) {
   return actual?.toLowerCase() === expected?.toLowerCase();
 }
 
+function readViews(product) {
+  return Number(product?.views || 0);
+}
+
+function assertCorsAllowed(response, origin) {
+  const allowedOrigin = response.headers.get("access-control-allow-origin");
+  assert(
+    allowedOrigin === origin || allowedOrigin === "*",
+    `CORS did not allow ${origin}. Received Access-Control-Allow-Origin: ${allowedOrigin || "<missing>"}`
+  );
+}
+
 function printFailureDetails(error) {
   const label = error.label || activeCheckLabel || "Production smoke test";
   console.error(`❌ ${label}`);
@@ -203,36 +215,84 @@ async function main() {
     assert(data?.status === "OK", "Backend health did not return status OK.");
   });
 
-  await runCheck("03 Frontend homepage", async () => {
+  await runCheck("03 Public stats", async () => {
+    const data = await requestJson("/stats/public", { method: "GET" }, [200]);
+    assert(data?.success === true, "Public stats did not return success true.");
+    assert(typeof data?.stats?.activeListings === "number", "Public stats missing activeListings number.");
+    assert(typeof data?.stats?.registeredVendors === "number", "Public stats missing registeredVendors number.");
+    assert(typeof data?.stats?.verifiedVendors === "number", "Public stats missing verifiedVendors number.");
+    assert(typeof data?.stats?.registeredBuyers === "number", "Public stats missing registeredBuyers number.");
+    assert(typeof data?.stats?.totalRenewals === "number", "Public stats missing totalRenewals number.");
+  });
+
+  await runCheck("04 Frontend homepage", async () => {
     await requestRawUrl(frontendOrigin, { method: "GET" }, [200]);
   });
 
-  await runCheck("04 Frontend /login", async () => {
+  await runCheck("05 Frontend /login", async () => {
     await requestRawUrl(buildFrontendUrl("/login"), { method: "GET" }, [200]);
   });
 
-  await runCheck("05 Frontend /privacy", async () => {
+  await runCheck("06 Frontend /privacy", async () => {
     await requestRawUrl(buildFrontendUrl("/privacy"), { method: "GET" }, [200]);
   });
 
-  await runCheck("06 Frontend /account-deletion", async () => {
+  await runCheck("07 Frontend /account-deletion", async () => {
     await requestRawUrl(buildFrontendUrl("/account-deletion"), { method: "GET" }, [200]);
   });
 
-  await runCheck("07 CORS", async () => {
+  await runCheck("08 CORS web frontend", async () => {
     const response = await requestRawUrl(
       `${API_BASE_URL.replace(/\/+$/, "")}/health`,
       { method: "GET", headers: { Origin: frontendOrigin } },
       [200]
     );
-    const allowedOrigin = response.headers.get("access-control-allow-origin");
-    assert(
-      allowedOrigin === frontendOrigin || Boolean(allowedOrigin),
-      "CORS response did not include Access-Control-Allow-Origin."
-    );
+    assertCorsAllowed(response, frontendOrigin);
   });
 
-  await runCheck("08 Customer login", async () => {
+  await runCheck("09 CORS Capacitor localhost", async () => {
+    const response = await requestRawUrl(
+      `${API_BASE_URL.replace(/\/+$/, "")}/health`,
+      { method: "GET", headers: { Origin: "capacitor://localhost" } },
+      [200]
+    );
+    assertCorsAllowed(response, "capacitor://localhost");
+  });
+
+  await runCheck("10 CORS HTTP localhost", async () => {
+    const response = await requestRawUrl(
+      `${API_BASE_URL.replace(/\/+$/, "")}/health`,
+      { method: "GET", headers: { Origin: "http://localhost" } },
+      [200]
+    );
+    assertCorsAllowed(response, "http://localhost");
+  });
+
+  await runCheck("11 CORS Ionic localhost", async () => {
+    const response = await requestRawUrl(
+      `${API_BASE_URL.replace(/\/+$/, "")}/health`,
+      { method: "GET", headers: { Origin: "ionic://localhost" } },
+      [200]
+    );
+    assertCorsAllowed(response, "ionic://localhost");
+  });
+
+  await runCheck("12 CORS HTTPS localhost", async () => {
+    const response = await requestRawUrl(
+      `${API_BASE_URL.replace(/\/+$/, "")}/health`,
+      { method: "GET", headers: { Origin: "https://localhost" } },
+      [200]
+    );
+    assertCorsAllowed(response, "https://localhost");
+  });
+
+  await runCheck("13 Product search", async () => {
+    const data = await requestJson("/products?search=iphone", { method: "GET" }, [200]);
+    assert(data?.success === true, "Product search did not return success true.");
+    assert(Array.isArray(data?.products), "Product search did not return a products array.");
+  });
+
+  await runCheck("14 Customer login", async () => {
     const data = await requestJson(
       "/auth/login",
       { method: "POST", body: { emailOrPhone: CUSTOMER_EMAIL, password: CUSTOMER_PASSWORD } },
@@ -243,7 +303,7 @@ async function main() {
     assert(Boolean(customerToken), "Customer login did not return a token.");
   });
 
-  await runCheck("09 Customer getMe", async () => {
+  await runCheck("15 Customer getMe", async () => {
     const data = await requestJson(
       "/auth/me",
       { method: "GET", headers: authHeaders(customerToken) },
@@ -253,7 +313,7 @@ async function main() {
     assert(emailsMatch(data?.user?.email, CUSTOMER_EMAIL), "Customer getMe returned the wrong email.");
   });
 
-  await runCheck("10 Vendor login", async () => {
+  await runCheck("16 Vendor login", async () => {
     const data = await requestJson(
       "/auth/login",
       { method: "POST", body: { emailOrPhone: VENDOR_EMAIL, password: VENDOR_PASSWORD } },
@@ -264,7 +324,7 @@ async function main() {
     assert(Boolean(vendorToken), "Vendor login did not return a token.");
   });
 
-  await runCheck("11 Vendor getMe", async () => {
+  await runCheck("17 Vendor getMe", async () => {
     const data = await requestJson(
       "/auth/me",
       { method: "GET", headers: authHeaders(vendorToken) },
@@ -274,14 +334,14 @@ async function main() {
     assert(emailsMatch(data?.user?.email, VENDOR_EMAIL), "Vendor getMe returned the wrong email.");
   });
 
-  await runCheck("12 Product list", async () => {
+  await runCheck("18 Product list", async () => {
     const data = await requestJson("/products", { method: "GET" }, [200]);
     assert(data?.success === true, "Product list did not return success true.");
     assert(Array.isArray(data?.products), "Product list did not return a products array.");
     firstProductId = getId(data.products[0]);
   });
 
-  await runCheck("13 Product detail", async () => {
+  await runCheck("19 Product detail", async () => {
     if (!firstProductId) return;
 
     const data = await requestJson(
@@ -290,6 +350,40 @@ async function main() {
       [200]
     );
     assert(data?.success === true, "Product detail did not return success true.");
+  });
+
+  await runCheck("20 Product detail unique guest views", async () => {
+    if (!firstProductId) return;
+
+    const viewerId = `prod-smoke-${Date.now()}`;
+    const first = await requestJson(
+      `/products/${encodeURIComponent(firstProductId)}`,
+      { method: "GET", headers: { "X-Viewer-Id": viewerId } },
+      [200]
+    );
+    const firstViews = readViews(first?.product);
+
+    const second = await requestJson(
+      `/products/${encodeURIComponent(firstProductId)}`,
+      { method: "GET", headers: { "X-Viewer-Id": viewerId } },
+      [200]
+    );
+    const secondViews = readViews(second?.product);
+
+    assert(
+      secondViews === firstViews,
+      `Repeated product detail with same X-Viewer-Id changed views from ${firstViews} to ${secondViews}.`
+    );
+
+    const third = await requestJson(
+      `/products/${encodeURIComponent(firstProductId)}`,
+      { method: "GET", headers: { "X-Viewer-Id": `${viewerId}-other` } },
+      [200]
+    );
+    assert(
+      readViews(third?.product) >= secondViews,
+      "Different X-Viewer-Id should not reduce product views."
+    );
   });
 
   console.log("Production smoke test completed successfully.");

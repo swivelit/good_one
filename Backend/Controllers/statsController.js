@@ -4,7 +4,13 @@ exports.getPublicStats = async (req, res) => {
   try {
     const now = new Date();
 
-    const [activeListings, verifiedVendors, registeredBuyers, renewalTotals] = await Promise.all([
+    const [
+      activeListings,
+      registeredVendors,
+      verifiedVendors,
+      registeredBuyers,
+      renewalTotals,
+    ] = await Promise.all([
       prisma.product.count({
         where: {
           isActive: true,
@@ -13,8 +19,18 @@ exports.getPublicStats = async (req, res) => {
       }),
       prisma.vendor.count({
         where: {
+          user: {
+            is: { isActive: true },
+          },
+        },
+      }),
+      prisma.vendor.count({
+        where: {
           isApproved: true,
           verificationStatus: 'verified',
+          user: {
+            is: { isActive: true },
+          },
         },
       }),
       prisma.user.count({
@@ -34,6 +50,7 @@ exports.getPublicStats = async (req, res) => {
       success: true,
       stats: {
         activeListings,
+        registeredVendors,
         verifiedVendors,
         registeredBuyers,
         totalRenewals: renewalTotals._sum.renewalCount || 0,

@@ -2,6 +2,11 @@ const prisma = require('../Db/prisma');
 const { assertCleanFields } = require('../utils/contentModeration');
 const { toCompat } = require('../utils/serialize');
 
+const isUuid = (value) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    String(value || '')
+  );
+
 const conversationInclude = {
   product: { select: { id: true, title: true, images: true, price: true, expiresAt: true } },
   vendor: { select: { id: true, name: true, avatar: true } },
@@ -27,6 +32,10 @@ const findBlockBetween = (userId, otherUserId) =>
 exports.getOrCreateConversation = async (req, res) => {
   try {
     const { productId } = req.body;
+    if (!isUuid(productId)) {
+      return res.status(400).json({ success: false, message: 'Invalid product id.' });
+    }
+
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
 
@@ -74,6 +83,10 @@ exports.getConversations = async (req, res) => {
 
 exports.getMessages = async (req, res) => {
   try {
+    if (!isUuid(req.params.conversationId)) {
+      return res.status(400).json({ success: false, message: 'Invalid conversation id.' });
+    }
+
     const conversation = await prisma.conversation.findUnique({
       where: { id: req.params.conversationId },
     });
@@ -108,6 +121,9 @@ exports.sendMessage = async (req, res) => {
     const { text, type, offerPrice, meetupDetails } = req.body;
     if (!text || !text.trim()) {
       return res.status(400).json({ success: false, message: 'Message text is required.' });
+    }
+    if (!isUuid(req.params.conversationId)) {
+      return res.status(400).json({ success: false, message: 'Invalid conversation id.' });
     }
 
     const conversation = await prisma.conversation.findUnique({

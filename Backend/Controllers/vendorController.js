@@ -1,6 +1,11 @@
 const prisma = require('../Db/prisma');
 const { toCompat } = require('../utils/serialize');
 
+const isUuid = (value) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    String(value || '')
+  );
+
 const vendorInclude = {
   user: { select: { id: true, name: true, email: true, phone: true, avatar: true, createdAt: true } },
 };
@@ -23,6 +28,10 @@ exports.getVendors = async (req, res) => {
 
 exports.getVendor = async (req, res) => {
   try {
+    if (!isUuid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid vendor id.' });
+    }
+
     const vendor = await prisma.vendor.findUnique({
       where: { id: req.params.id },
       include: vendorInclude,

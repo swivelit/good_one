@@ -54,7 +54,7 @@ export default function VendorProfile() {
         {[
           { label: 'Active Products', value: products.length, icon: 'bi-grid-fill', color: '#FF6B35' },
           { label: 'Total Reviews', value: vendor.totalReviews || 0, icon: 'bi-star-fill', color: '#f59e0b' },
-          { label: 'Verified', value: vendor.verificationStatus === 'verified' ? '✓ Yes' : 'Pending', icon: 'bi-shield-check', color: '#10b981' },
+          { label: 'Registered', value: 'Yes', icon: 'bi-shop', color: '#10b981' },
         ].map(s => (
           <div key={s.label} className="col-4">
             <div className="text-center p-3 rounded-3 bg-white shadow-sm">

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
 import { productAPI, chatAPI, reportAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import toast from "react-hot-toast";
@@ -16,8 +15,7 @@ function getTimeLeft(expiresAt) {
   return { text: `${h}h left`, cls: "success" };
 }
 
-const PLACEHOLDER =
-  "https://via.placeholder.com/600x420/FF6B35/ffffff?text=No+Image";
+const PLACEHOLDER = "/logo512.png";
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -27,7 +25,7 @@ export default function ProductDetail() {
   const [chatLoading, setChatLoading] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
-  const browsePath = Capacitor.isNativePlatform() ? "/browse" : "/";
+  const browsePath = "/browse";
 
  useEffect(() => {
     productAPI
@@ -126,7 +124,7 @@ export default function ProductDetail() {
       <nav aria-label="breadcrumb" className="mb-4">
         <ol className="breadcrumb">
           <li className="breadcrumb-item">
-            <Link to={browsePath}>Home</Link>
+            <Link to={browsePath}>Browse</Link>
           </li>
           <li className="breadcrumb-item">
             <Link to={`${browsePath}?category=${encodeURIComponent(product.category)}`}>
@@ -140,79 +138,36 @@ export default function ProductDetail() {
       <div className="row g-4">
         {/* Gallery */}
         <div className="col-md-6">
-  
+          <div className="product-detail-gallery">
+            <div className="product-detail-main-image" onMouseMove={handleMouseMove}>
+              <img
+                src={imgs[activeImg]}
+                alt={product.title}
+                loading="lazy"
+                onError={(e) => (e.target.src = PLACEHOLDER)}
+              />
+            </div>
 
-      {/* Main Product Image */}
-      <div
-        className="product-gallery mb-3"
-        onMouseMove={handleMouseMove}
-        style={{
-          width: "100%",
-          aspectRatio: "1 / 1",
-          overflow: "hidden",
-          borderRadius: "12px",
-          position: "relative",
-          cursor: "grab",
-          border: "1px solid #eee",
-            height: "clamp(320px, 50vw, 540px)"
-
-        }}
-      >
-        <img
-          src={imgs[activeImg]}
-          alt={product.title}
-          loading="lazy"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            transition: "opacity 0.2s ease",
-            userSelect: "none",
-            pointerEvents: "none"
-          }}
-          onError={(e) => (e.target.src = PLACEHOLDER)}
-        />
-
- {/* Thumbnail Images */}
-      {imgs.length > 1 && (
-        <div
-          style={{
-            display: "flex",
-            gap: "8px",
-            flexWrap: "wrap",
-            marginTop: "10px",
-            alignItems:"center",
-            justifyContent:"center"
-          }}
-        >
-          {imgs.map((img, i) => (
-            <img
-              key={i}
-              src={img}
-              alt={`thumb-${i}`}
-              onClick={() => setActiveImg(i)}
-              style={{
-                width: "100px",
-                height: "100px",
-                objectFit: "cover",
-                borderRadius: "8px",
-                cursor: "pointer",
-                border: activeImg === i
-                  ? "2px solid #FF6B35"
-                  : "2px solid #ddd",
-                transition: "all 0.2s ease"
-              }}
-              onError={(e) => (e.target.src = PLACEHOLDER)}
-            />
-          ))}
-        </div>
-      )}
-
-
-      </div>
-
-
-     
+            {imgs.length > 1 && (
+              <div className="product-detail-thumbnails" aria-label="Product images">
+                {imgs.map((img, i) => (
+                  <button
+                    key={`${img}-${i}`}
+                    type="button"
+                    className={`product-detail-thumbnail ${activeImg === i ? "active" : ""}`}
+                    onClick={() => setActiveImg(i)}
+                    aria-label={`Show product image ${i + 1}`}
+                  >
+                    <img
+                      src={img}
+                      alt=""
+                      onError={(e) => (e.target.src = PLACEHOLDER)}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Info */}
@@ -301,7 +256,7 @@ export default function ProductDetail() {
                 className="bi bi-shield-check fs-4 d-block mb-1"
                 style={{ color: "#FF6B35" }}
               ></i>
-              Verified Vendor
+              Registered Seller
             </div>
             <div
               className="flex-fill p-3 rounded-3 text-center small"

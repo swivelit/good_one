@@ -22,24 +22,45 @@ const CATEGORIES = [
 
 const EMPTY_STATS = {
   activeListings: 0,
-  verifiedVendors: 0,
+  registeredVendors: 0,
   registeredBuyers: 0,
   totalRenewals: 0,
 };
 
 export default function HomePage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const search = (searchParams.get("search") || "").trim();
+  const categoryParam = (searchParams.get("category") || "").trim();
+  const categoryFromQuery =
+    CATEGORIES.find((cat) => cat.toLowerCase() === categoryParam.toLowerCase()) || "All";
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(EMPTY_STATS);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [category, setCategory] = useState("All");
-  const [categorySearchScope, setCategorySearchScope] = useState("");
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const search = (searchParams.get("search") || "").trim();
+  const [category, setCategory] = useState(categoryFromQuery);
   const browsePath = "/browse";
+
+  const buildBrowseUrl = useCallback(
+    ({ nextCategory = category, nextSearch = search } = {}) => {
+      const params = new URLSearchParams();
+      const normalizedSearch = String(nextSearch || "").trim();
+
+      if (nextCategory && nextCategory !== "All") {
+        params.set("category", nextCategory);
+      }
+      if (normalizedSearch) {
+        params.set("search", normalizedSearch);
+      }
+
+      const query = params.toString();
+      return query ? `${browsePath}?${query}` : browsePath;
+    },
+    [browsePath, category, search]
+  );
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -47,15 +68,10 @@ export default function HomePage() {
 
       const params = { page, limit: 12 };
 
-      const categoryWasSelectedForCurrentSearch = categorySearchScope === search;
-      if (category !== "All" && categoryWasSelectedForCurrentSearch) {
-        params.category = category;
-      }
+      if (category !== "All") params.category = category;
       if (search) params.search = search;
 
       const { data } = await productAPI.getAll(params);
-
-      console.log("Products API response:", data);
 
       setProducts(data?.products || []);
       setPages(data?.pages || 1);
@@ -63,7 +79,7 @@ export default function HomePage() {
     } catch (error) {
       console.error("Product fetch error:", error);
 
-      toast.error("Failed to load products, showing demo data");
+      toast.error("Failed to load products");
 
       setProducts([]);
       setPages(1);
@@ -71,7 +87,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [category, categorySearchScope, page, search]);
+  }, [category, page, search]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -85,8 +101,8 @@ export default function HomePage() {
 
   useEffect(() => {
     setPage(1);
-    setCategory("All");
-  }, [search]);
+    setCategory(categoryFromQuery);
+  }, [categoryFromQuery, search]);
 
   useEffect(() => {
     fetchProducts();
@@ -116,7 +132,7 @@ export default function HomePage() {
                 <span style={{ color: "#F7C59F" }}>Directly. Locally.</span>
               </h1>
               <p className="lead mb-4 opacity-90">
-                Connect with verified vendors. Chat, negotiate, and meet up — no
+                Connect with registered vendors. Chat, negotiate, and meet up — no
                 middleman, no hassle.
               </p>
               <div className="d-flex flex-wrap gap-3">
@@ -137,7 +153,7 @@ export default function HomePage() {
               </div>
               <div className="d-flex gap-4 mt-4 flex-wrap">
                 {[
-                  ["bi-shield-check", "Verified Vendors"],
+                  ["bi-shield-check", "Registered Vendors"],
                   ["bi-chat-dots", "Direct Chat"],
                   ["bi-clock", "24h Listings"],
                 ].map(([ic, label]) => (
@@ -210,7 +226,7 @@ export default function HomePage() {
           <div className="row text-center g-3">
             {[
               [stats.activeListings, "Active Listings"],
-              [stats.verifiedVendors, "Verified Vendors"],
+              [stats.registeredVendors, "Registered Vendors"],
               [stats.registeredBuyers, "Registered Buyers"],
               [stats.totalRenewals, "Listing Renewals"],
             ].map(([num, lbl]) => (
@@ -237,7 +253,7 @@ export default function HomePage() {
               </span>
               <button
                 className="btn btn-sm btn-outline-warning ms-auto"
-                onClick={() => navigate(browsePath)}
+                onClick={() => navigate(buildBrowseUrl({ nextSearch: "" }))}
               >
                 Clear
               </button>
@@ -253,8 +269,8 @@ export default function HomePage() {
                 className={`category-chip ${category === cat ? "active" : ""}`}
                 onClick={() => {
                   setCategory(cat);
-                  setCategorySearchScope(search);
                   setPage(1);
+                  navigate(buildBrowseUrl({ nextCategory: cat }));
                 }}
               >
                 {cat}
@@ -379,14 +395,14 @@ export default function HomePage() {
                 color: "#FF6B35",
                 step: "01",
                 title: "Create Account",
-                desc: "Register as a customer to shop or as a verified vendor to sell products.",
+                desc: "Register as a customer to shop or as a vendor to sell products.",
               },
               {
                 icon: "bi-grid-fill",
                 color: "#2C3E50",
                 step: "02",
                 title: "Browse Products",
-                desc: "Explore fresh 24-hour listings from verified vendors in your area.",
+                desc: "Explore fresh 24-hour listings from registered vendors in your area.",
               },
               {
                 icon: "bi-chat-dots-fill",
@@ -436,9 +452,9 @@ export default function HomePage() {
         <div className="container text-center text-white">
           <h2 className="fw-bold mb-2">Ready to Start Selling?</h2>
           <p className="opacity-80 mb-4">
-            {stats.verifiedVendors
-              ? `Join ${stats.verifiedVendors} verified vendors already growing their business on GoodOne`
-              : "Join verified vendors already growing their business on GoodOne"}
+            {stats.registeredVendors
+              ? `Join ${stats.registeredVendors} registered vendors already growing their business on GoodOne`
+              : "Join registered vendors already growing their business on GoodOne"}
           </p>
           <Link
             to="/register/vendor"

@@ -1,6 +1,14 @@
 import { render, screen } from '@testing-library/react';
+import { Capacitor } from '@capacitor/core';
 import App from './App';
+import AppVideoManager from './components/AppVideoManager';
 import MobileWelcomePage from './pages/MobileWelcomePage';
+
+jest.mock('@capacitor/core', () => ({
+  Capacitor: {
+    isNativePlatform: jest.fn(() => false),
+  },
+}));
 
 jest.mock('react-router-dom', () => {
   const React = require('react');
@@ -36,4 +44,21 @@ test('MobileWelcomePage renders native auth choices', () => {
   expect(screen.getByText(/Create Customer Account/i)).toBeInTheDocument();
   expect(screen.getByText(/Become a Vendor/i)).toBeInTheDocument();
   expect(screen.getByText(/Continue Browsing/i)).toBeInTheDocument();
+});
+
+test('AppVideoManager stays hidden on web', () => {
+  Capacitor.isNativePlatform.mockReturnValue(false);
+
+  const { container } = render(<AppVideoManager />);
+
+  expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
+  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+});
+
+test('AppVideoManager renders splash only in native Capacitor mode', () => {
+  Capacitor.isNativePlatform.mockReturnValue(true);
+
+  const { container } = render(<AppVideoManager />);
+
+  expect(container.querySelector('.app-video-splash')).toBeInTheDocument();
 });
