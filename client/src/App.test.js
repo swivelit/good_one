@@ -35,4 +35,5 @@ test('MobileWelcomePage renders native auth choices', () => {
   expect(screen.getByText(/Sign In/i)).toBeInTheDocument();
   expect(screen.getByText(/Create Customer Account/i)).toBeInTheDocument();
   expect(screen.getByText(/Become a Vendor/i)).toBeInTheDocument();
+  expect(screen.getByText(/Continue Browsing/i)).toBeInTheDocument();
 });

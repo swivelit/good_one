@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const prisma = require('../Db/prisma');
 const { assertCleanFields } = require('../utils/contentModeration');
 const { toCompat } = require('../utils/serialize');
@@ -19,8 +20,26 @@ const productInclude = {
 
 const parseTags = (tags) => {
   if (!tags) return [];
-  if (Array.isArray(tags)) return tags.map((tag) => String(tag).trim()).filter(Boolean);
-  return String(tags).split(',').map((tag) => tag.trim()).filter(Boolean);
+  const values = Array.isArray(tags) ? tags : String(tags).split(',');
+  return values
+    .map((tag) => String(tag).trim().toLowerCase())
+    .filter(Boolean);
+};
+
+const normalizeSearchTerm = (value) => String(value || '').trim().replace(/\s+/g, ' ');
+
+const getHeaderValue = (value) => {
+  if (Array.isArray(value)) return value[0];
+  return value;
+};
+
+const buildGuestViewerKey = (req) => {
+  const headerViewerId = String(getHeaderValue(req.headers['x-viewer-id']) || '').trim();
+  if (headerViewerId) return `guest:${headerViewerId.slice(0, 128)}`;
+
+  const fingerprint = `${req.ip || ''}|${req.headers['user-agent'] || ''}`;
+  const hash = crypto.createHash('sha256').update(fingerprint).digest('hex');
+  return `guest:fingerprint:${hash}`;
 };
 
 const productDataFromBody = (body) => {
@@ -66,13 +85,30 @@ exports.getProducts = async (req, res) => {
       expiresAt: { gt: new Date() },
     };
 
-    if (category && category !== 'All' && category !== 'all') where.category = category;
+    const normalizedCategory = String(category || '').trim();
+    if (
+      normalizedCategory &&
+      normalizedCategory !== 'All' &&
+      normalizedCategory.toLowerCase() !== 'all'
+    ) {
+      where.category = normalizedCategory;
+    }
 
-    if (search) {
+    const normalizedSearch = normalizeSearchTerm(search);
+    if (normalizedSearch) {
+      const normalizedSearchLower = normalizedSearch.toLowerCase();
+      const tagTerms = Array.from(new Set([
+        normalizedSearchLower,
+        ...normalizedSearchLower.split(/\s+/).filter(Boolean),
+      ]));
+
       where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { tags: { has: search } },
+        { title: { contains: normalizedSearch, mode: 'insensitive' } },
+        { description: { contains: normalizedSearch, mode: 'insensitive' } },
+        { category: { contains: normalizedSearch, mode: 'insensitive' } },
+        { location: { contains: normalizedSearch, mode: 'insensitive' } },
+        { condition: { contains: normalizedSearch, mode: 'insensitive' } },
+        ...tagTerms.map((tag) => ({ tags: { has: tag } })),
       ];
     }
 
@@ -101,16 +137,43 @@ exports.getProducts = async (req, res) => {
 
 exports.getProduct = async (req, res) => {
   try {
-    const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
-    if (!existing) return res.status(404).json({ success: false, message: 'Product not found.' });
-
-    const product = await prisma.product.update({
+    const product = await prisma.product.findUnique({
       where: { id: req.params.id },
-      data: { views: { increment: 1 } },
       include: productInclude,
     });
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
 
-    res.json({ success: true, product: toCompat(product) });
+    let productForResponse = product;
+    const userId = req.user?.id;
+    const isOwnerView = userId && product.vendorUserId === userId;
+
+    if (!isOwnerView) {
+      const viewerUserId = userId || null;
+      const viewerKey = viewerUserId ? `user:${viewerUserId}` : buildGuestViewerKey(req);
+
+      try {
+        const [, updatedProduct] = await prisma.$transaction([
+          prisma.productView.create({
+            data: {
+              productId: product.id,
+              viewerUserId,
+              viewerKey,
+            },
+          }),
+          prisma.product.update({
+            where: { id: product.id },
+            data: { views: { increment: 1 } },
+            include: productInclude,
+          }),
+        ]);
+
+        productForResponse = updatedProduct;
+      } catch (error) {
+        if (error.code !== 'P2002') throw error;
+      }
+    }
+
+    res.json({ success: true, product: toCompat(productForResponse) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -190,6 +253,7 @@ exports.renewProduct = async (req, res) => {
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         renewedAt: new Date(),
         isActive: true,
+        renewalCount: { increment: 1 },
       },
     });
     res.json({ success: true, message: 'Product listing renewed for 24 hours!', product: toCompat(updated) });

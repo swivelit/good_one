@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { useAuth } from "./AuthContext";
@@ -10,11 +10,16 @@ export default function Navbar() {
   const location = useLocation();
   const [search, setSearch] = useState("");
   const isNative = Capacitor.isNativePlatform();
-  const browsePath = isNative ? "/browse" : "/";
+  const browsePath = "/browse";
   const logoutPath = isNative ? "/" : "/login";
   const showNativeSearch =
     isNative &&
     ["/browse", "/products"].some((path) => location.pathname.startsWith(path));
+
+  useEffect(() => {
+    const currentSearch = new URLSearchParams(location.search).get("search") || "";
+    setSearch(currentSearch);
+  }, [location.search]);
 
   const handleLogout = () => {
     logout();
@@ -28,6 +33,15 @@ export default function Navbar() {
     if (search.trim()) {
       navigate(`${browsePath}?search=${encodeURIComponent(search.trim())}`);
     } else {
+      navigate(browsePath);
+    }
+  };
+
+  const handleSearchChange = (e) => {
+    const nextSearch = e.target.value;
+    setSearch(nextSearch);
+
+    if (!nextSearch.trim() && new URLSearchParams(location.search).has("search")) {
       navigate(browsePath);
     }
   };
@@ -79,7 +93,7 @@ export default function Navbar() {
                 type="search"
                 placeholder="Search products"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={handleSearchChange}
               />
             </form>
           )}
@@ -151,7 +165,7 @@ export default function Navbar() {
                 type="search"
                 placeholder="Search products..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={handleSearchChange}
                 style={{ borderRadius: "10px 0 0 10px" }}
               />
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
-import { productAPI } from "../api";
+import { productAPI, statsAPI } from "../api";
 import ProductCard from "../productCard";
 import toast from "react-hot-toast";
 import "../App.css";
@@ -21,19 +20,26 @@ const CATEGORIES = [
   "Other",
 ];
 
-/* Demo products fallback if API fails */
+const EMPTY_STATS = {
+  activeListings: 0,
+  verifiedVendors: 0,
+  registeredBuyers: 0,
+  totalRenewals: 0,
+};
 
 export default function HomePage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(EMPTY_STATS);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [category, setCategory] = useState("All");
+  const [categorySearchScope, setCategorySearchScope] = useState("");
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const search = searchParams.get("search") || "";
-  const browsePath = Capacitor.isNativePlatform() ? "/browse" : "/";
+  const search = (searchParams.get("search") || "").trim();
+  const browsePath = "/browse";
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -41,7 +47,10 @@ export default function HomePage() {
 
       const params = { page, limit: 12 };
 
-      if (category !== "all") params.category = category;
+      const categoryWasSelectedForCurrentSearch = categorySearchScope === search;
+      if (category !== "All" && categoryWasSelectedForCurrentSearch) {
+        params.category = category;
+      }
       if (search) params.search = search;
 
       const { data } = await productAPI.getAll(params);
@@ -62,11 +71,30 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [category, page, search]);
+  }, [category, categorySearchScope, page, search]);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const { data } = await statsAPI.getPublic();
+      setStats({ ...EMPTY_STATS, ...(data?.stats || {}) });
+    } catch (error) {
+      console.error("Stats fetch error:", error);
+      setStats(EMPTY_STATS);
+    }
+  }, []);
+
+  useEffect(() => {
+    setPage(1);
+    setCategory("All");
+  }, [search]);
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   return (
     <>
@@ -138,7 +166,7 @@ export default function HomePage() {
                       borderRadius: 20,
                     }}
                   >
-                    {total || "100+"} Active
+                    {total} Active
                   </span>
                 </div>
 
@@ -181,14 +209,14 @@ export default function HomePage() {
         <div className="container">
           <div className="row text-center g-3">
             {[
-              [500, "Active Listings"],
-              [200, "Verified Vendors"],
-              [1000, "Happy Buyers"],
-              [24, "Auto Renewal"],
+              [stats.activeListings, "Active Listings"],
+              [stats.verifiedVendors, "Verified Vendors"],
+              [stats.registeredBuyers, "Registered Buyers"],
+              [stats.totalRenewals, "Listing Renewals"],
             ].map(([num, lbl]) => (
               <div key={lbl} className="col-6 col-md-3">
                 <div className="fw-bold fs-4" style={{ color: "#FF6B35" }}>
-                  <CountUp end={num} duration={2} />+
+                  <CountUp end={Number(num) || 0} duration={2} />
                 </div>
 
                 <div className="text-muted small">{lbl}</div>
@@ -225,6 +253,7 @@ export default function HomePage() {
                 className={`category-chip ${category === cat ? "active" : ""}`}
                 onClick={() => {
                   setCategory(cat);
+                  setCategorySearchScope(search);
                   setPage(1);
                 }}
               >
@@ -237,7 +266,7 @@ export default function HomePage() {
             <h2 className="section-title mb-0">
               {search
                 ? "Search Results"
-                : category === "all"
+                : category === "All"
                   ? "All Products"
                   : category}
             </h2>
@@ -407,7 +436,9 @@ export default function HomePage() {
         <div className="container text-center text-white">
           <h2 className="fw-bold mb-2">Ready to Start Selling?</h2>
           <p className="opacity-80 mb-4">
-            Join 200+ vendors already growing their business on GoodOne
+            {stats.verifiedVendors
+              ? `Join ${stats.verifiedVendors} verified vendors already growing their business on GoodOne`
+              : "Join verified vendors already growing their business on GoodOne"}
           </p>
           <Link
             to="/register/vendor"

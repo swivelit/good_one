@@ -3,6 +3,7 @@ import { BrowserRouter, HashRouter, Routes, Route, Navigate, useLocation } from 
 import { Capacitor } from '@capacitor/core';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './AuthContext';
+import AppVideoManager from './components/AppVideoManager';
 import Navbar from './Navbar';
 import Footer from './footer';
 import HomePage from './pages/HomePage';
@@ -77,6 +78,7 @@ export default function App() {
     <AuthProvider>
       <Router>
         <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
+        <AppVideoManager />
         <AppRoutes />
       </Router>
     </AuthProvider>

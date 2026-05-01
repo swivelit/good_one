@@ -2,11 +2,15 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../Db/prisma');
 const { sanitizeUser } = require('../utils/serialize');
 
-exports.protect = async (req, res, next) => {
-  let token;
+const getBearerToken = (req) => {
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
+    return req.headers.authorization.split(' ')[1];
   }
+  return null;
+};
+
+exports.protect = async (req, res, next) => {
+  const token = getBearerToken(req);
   if (!token) {
     return res.status(401).json({ success: false, message: 'Not authorized, no token' });
   }
@@ -21,6 +25,21 @@ exports.protect = async (req, res, next) => {
   } catch (error) {
     return res.status(401).json({ success: false, message: 'Token invalid or expired' });
   }
+};
+
+exports.optionalAuth = async (req, res, next) => {
+  const token = getBearerToken(req);
+  if (!token) return next();
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+    if (user) req.user = sanitizeUser(user);
+  } catch (error) {
+    req.user = undefined;
+  }
+
+  return next();
 };
 
 exports.vendorOnly = (req, res, next) => {

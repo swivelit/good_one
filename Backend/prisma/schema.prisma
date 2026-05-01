@@ -34,6 +34,7 @@ model User {
   reportsReceived       Report[]       @relation("ReportReportedUser")
   blocksMade            Block[]        @relation("BlockBlocker")
   blocksReceived        Block[]        @relation("BlockBlockedUser")
+  productViews          ProductView[]  @relation("ProductViewUser")
 }
 
 model Vendor {
@@ -76,6 +77,7 @@ model Product {
   expiresAt     DateTime @default(dbgenerated("(now() + interval '1 day')"))
   renewedAt     DateTime @default(now())
   views         Int      @default(0)
+  renewalCount  Int      @default(0)
   tags          String[] @default([])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -84,10 +86,26 @@ model Product {
   vendorUser    User           @relation("ProductVendorUser", fields: [vendorUserId], references: [id], onDelete: Cascade)
   conversations Conversation[]
   reports       Report[]
+  viewEvents    ProductView[]
 
   @@index([expiresAt])
   @@index([vendorId])
   @@index([vendorUserId])
+}
+
+model ProductView {
+  id           String   @id @default(uuid()) @db.Uuid
+  productId    String   @db.Uuid
+  viewerUserId String?  @db.Uuid
+  viewerKey    String
+  createdAt    DateTime @default(now())
+
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  viewerUser User?   @relation("ProductViewUser", fields: [viewerUserId], references: [id], onDelete: SetNull)
+
+  @@unique([productId, viewerKey])
+  @@index([productId])
+  @@index([viewerUserId])
 }
 
 model Conversation {

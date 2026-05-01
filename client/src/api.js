@@ -1,13 +1,45 @@
 import axios from 'axios';
 import { API_URL } from './config';
 
+const VIEWER_ID_KEY = 'goodone_viewer_id';
+
+const createViewerId = () => {
+  const cryptoRef = typeof window !== 'undefined' ? window.crypto : null;
+  if (cryptoRef?.randomUUID) return cryptoRef.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+};
+
+const getViewerId = () => {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+
+  try {
+    const existing = window.localStorage.getItem(VIEWER_ID_KEY);
+    if (existing) return existing;
+
+    const viewerId = createViewerId();
+    window.localStorage.setItem(VIEWER_ID_KEY, viewerId);
+    return viewerId;
+  } catch (error) {
+    return null;
+  }
+};
+
 const API = axios.create({ 
   baseURL: API_URL
 });
 
 API.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  let token = null;
+  try {
+    token = localStorage.getItem('token');
+  } catch (error) {
+    token = null;
+  }
+  const viewerId = getViewerId();
+
+  config.headers = config.headers || {};
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (viewerId) config.headers['X-Viewer-Id'] = viewerId;
   return config;
 });
 
@@ -30,6 +62,10 @@ export const productAPI = {
   delete: (id) => API.delete(`/products/${id}`),
   getMine: () => API.get('/products/my-products'),
   getByVendor: (vendorId) => API.get(`/products/vendor/${vendorId}`),
+};
+
+export const statsAPI = {
+  getPublic: () => API.get('/stats/public'),
 };
 
 export const chatAPI = {
