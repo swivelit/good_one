@@ -89,11 +89,18 @@ const renderNativeFloatingVideo = () => {
     jest.advanceTimersByTime(4000);
   });
   act(() => {
-    jest.advanceTimersByTime(120000);
+    jest.advanceTimersByTime(5000);
   });
 
   return view;
 };
+
+test('AppVideoManager renders floating video after five second native delay', () => {
+  const { container } = renderNativeFloatingVideo();
+
+  expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
+  expect(screen.queryByLabelText(/close video/i)).not.toBeInTheDocument();
+});
 
 test('AppVideoManager expands floating video on tap and collapses from backdrop', () => {
   const { container } = renderNativeFloatingVideo();
@@ -111,16 +118,15 @@ test('AppVideoManager expands floating video on tap and collapses from backdrop'
   expect(container.querySelector('.floating-video-backdrop')).not.toBeInTheDocument();
 });
 
-test('AppVideoManager close button hides expanded floating video', () => {
+test('AppVideoManager has no close button after expanding floating video', () => {
   const { container } = renderNativeFloatingVideo();
   const widget = container.querySelector('.floating-video-widget');
 
   fireEvent.pointerDown(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
   fireEvent.pointerUp(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
-  fireEvent.click(screen.getByLabelText(/close video/i));
 
-  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
-  expect(container.querySelector('.floating-video-backdrop')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/close video/i)).not.toBeInTheDocument();
+  expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
 });
 
 test('AppVideoManager drag movement does not expand floating video', () => {

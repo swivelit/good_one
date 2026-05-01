@@ -823,30 +823,6 @@ body {
   object-fit: cover;
 }
 
-.floating-video-close {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 1;
-  width: 24px;
-  height: 24px;
-  border: 0;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.62);
-  line-height: 1;
-}
-
-.floating-video-widget.expanded .floating-video-close {
-  top: 8px;
-  right: 8px;
-  width: 32px;
-  height: 32px;
-}
-
 .product-detail-gallery {
   display: flex;
   flex-direction: column;

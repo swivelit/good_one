@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 
 const INTRO_TIMEOUT_MS = 4000;
-const POPUP_DELAY_MS = 120000;
+const POPUP_DELAY_MS = 5000;
 const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
 const DEFAULT_BOTTOM_OFFSET = 90;
@@ -140,15 +140,6 @@ export default function AppVideoManager() {
     }, POPUP_DELAY_MS);
   }, [clearPopupTimer, isNative, loadPosition, showFloating, showSplash]);
 
-  const handleCloseFloating = useCallback((event) => {
-    event.stopPropagation();
-    clearPopupTimer();
-    setShowFloating(false);
-    setIsDragging(false);
-    setIsExpanded(false);
-    dragRef.current = null;
-  }, [clearPopupTimer]);
-
   const handlePointerDown = useCallback((event) => {
     if (isExpanded || !floatingPosition || event.button > 0) return;
 
@@ -226,7 +217,6 @@ export default function AppVideoManager() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         clearPopupTimer();
-        setShowFloating(false);
         setIsExpanded(false);
         setIsDragging(false);
         dragRef.current = null;
@@ -306,15 +296,6 @@ export default function AppVideoManager() {
             onPointerUp={finishDrag}
             onPointerCancel={finishDrag}
           >
-            <button
-              type="button"
-              className="floating-video-close"
-              aria-label="Close video"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={handleCloseFloating}
-            >
-              <i className="bi bi-x"></i>
-            </button>
             <video src={VIDEO_SRC} autoPlay muted playsInline loop />
           </div>
         </>
