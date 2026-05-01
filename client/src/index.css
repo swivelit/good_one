@@ -787,16 +787,39 @@ body {
   touch-action: none;
   cursor: grab;
   user-select: none;
+  transition: width 180ms ease, transform 180ms ease, border-radius 180ms ease, box-shadow 180ms ease;
 }
 
 .floating-video-widget.dragging {
   cursor: grabbing;
 }
 
+.floating-video-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1084;
+  background: transparent;
+}
+
+.floating-video-widget.expanded {
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%);
+  width: min(75vw, 42vh, 420px);
+  aspect-ratio: 9 / 16;
+  border-radius: 20px;
+  cursor: default;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+}
+
 .floating-video-widget video {
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: cover;
+}
+
+.floating-video-widget.expanded video {
   object-fit: cover;
 }
 
@@ -815,6 +838,13 @@ body {
   color: #fff;
   background: rgba(0, 0, 0, 0.62);
   line-height: 1;
+}
+
+.floating-video-widget.expanded .floating-video-close {
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
 }
 
 .product-detail-gallery {

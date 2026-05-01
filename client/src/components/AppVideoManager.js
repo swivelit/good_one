@@ -6,6 +6,7 @@ const POPUP_DELAY_MS = 120000;
 const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
 const DEFAULT_BOTTOM_OFFSET = 90;
+const DRAG_THRESHOLD_PX = 7;
 const PUBLIC_URL = (process.env.PUBLIC_URL || "").replace(/\/$/, "");
 const VIDEO_SRC = `${PUBLIC_URL}/media/goodone-intro.mp4`;
 
@@ -45,6 +46,7 @@ export default function AppVideoManager() {
   const [showFloating, setShowFloating] = useState(false);
   const [floatingPosition, setFloatingPosition] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const splashTimerRef = useRef(null);
   const popupTimerRef = useRef(null);
   const widgetRef = useRef(null);
@@ -143,11 +145,12 @@ export default function AppVideoManager() {
     clearPopupTimer();
     setShowFloating(false);
     setIsDragging(false);
+    setIsExpanded(false);
     dragRef.current = null;
   }, [clearPopupTimer]);
 
   const handlePointerDown = useCallback((event) => {
-    if (!floatingPosition || event.button > 0) return;
+    if (isExpanded || !floatingPosition || event.button > 0) return;
 
     event.currentTarget.setPointerCapture?.(event.pointerId);
     dragRef.current = {
@@ -156,18 +159,26 @@ export default function AppVideoManager() {
       startY: event.clientY,
       startLeft: floatingPosition.left,
       startTop: floatingPosition.top,
+      hasMoved: false,
     };
-    setIsDragging(true);
-  }, [floatingPosition]);
+  }, [floatingPosition, isExpanded]);
 
   const handlePointerMove = useCallback((event) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
 
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (!drag.hasMoved && Math.hypot(deltaX, deltaY) < DRAG_THRESHOLD_PX) {
+      return;
+    }
+
+    drag.hasMoved = true;
+    setIsDragging(true);
     event.preventDefault();
     const nextPosition = clampPosition({
-      left: drag.startLeft + event.clientX - drag.startX,
-      top: drag.startTop + event.clientY - drag.startY,
+      left: drag.startLeft + deltaX,
+      top: drag.startTop + deltaY,
     });
     setFloatingPosition(nextPosition);
   }, [clampPosition]);
@@ -179,6 +190,12 @@ export default function AppVideoManager() {
     event.currentTarget.releasePointerCapture?.(event.pointerId);
     dragRef.current = null;
     setIsDragging(false);
+
+    if (!drag.hasMoved) {
+      setIsExpanded(true);
+      return;
+    }
+
     setFloatingPosition((current) => {
       const clamped = clampPosition(current || getDefaultPosition());
       savePosition(clamped);
@@ -265,30 +282,39 @@ export default function AppVideoManager() {
       )}
 
       {!showSplash && showFloating && (
-        <div
-          ref={widgetRef}
-          className={`floating-video-widget ${isDragging ? "dragging" : ""}`}
-          style={
-            floatingPosition
-              ? { left: `${floatingPosition.left}px`, top: `${floatingPosition.top}px` }
-              : undefined
-          }
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={finishDrag}
-          onPointerCancel={finishDrag}
-        >
-          <button
-            type="button"
-            className="floating-video-close"
-            aria-label="Close video"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={handleCloseFloating}
+        <>
+          {isExpanded && (
+            <div
+              className="floating-video-backdrop"
+              role="presentation"
+              onPointerDown={() => setIsExpanded(false)}
+            />
+          )}
+          <div
+            ref={widgetRef}
+            className={`floating-video-widget ${isDragging ? "dragging" : ""} ${isExpanded ? "expanded" : ""}`}
+            style={
+              floatingPosition && !isExpanded
+                ? { left: `${floatingPosition.left}px`, top: `${floatingPosition.top}px` }
+                : undefined
+            }
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={finishDrag}
+            onPointerCancel={finishDrag}
           >
-            <i className="bi bi-x"></i>
-          </button>
-          <video src={VIDEO_SRC} autoPlay muted playsInline loop />
-        </div>
+            <button
+              type="button"
+              className="floating-video-close"
+              aria-label="Close video"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={handleCloseFloating}
+            >
+              <i className="bi bi-x"></i>
+            </button>
+            <video src={VIDEO_SRC} autoPlay muted playsInline loop />
+          </div>
+        </>
       )}
     </>
   );

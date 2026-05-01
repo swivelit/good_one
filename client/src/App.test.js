@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Capacitor } from '@capacitor/core';
 import App from './App';
 import AppVideoManager from './components/AppVideoManager';
@@ -33,6 +33,11 @@ jest.mock('react-router-dom', () => {
 
 beforeEach(() => {
   Capacitor.isNativePlatform.mockReturnValue(false);
+  localStorage.clear();
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 test('renders GoodOne app shell', () => {
@@ -72,4 +77,60 @@ test('AppVideoManager renders splash only in native Capacitor mode', () => {
   const { container } = render(<AppVideoManager />);
 
   expect(container.querySelector('.app-video-splash')).toBeInTheDocument();
+});
+
+const renderNativeFloatingVideo = () => {
+  jest.useFakeTimers();
+  Capacitor.isNativePlatform.mockReturnValue(true);
+
+  const view = render(<AppVideoManager />);
+
+  act(() => {
+    jest.advanceTimersByTime(4000);
+  });
+  act(() => {
+    jest.advanceTimersByTime(120000);
+  });
+
+  return view;
+};
+
+test('AppVideoManager expands floating video on tap and collapses from backdrop', () => {
+  const { container } = renderNativeFloatingVideo();
+  const widget = container.querySelector('.floating-video-widget');
+
+  fireEvent.pointerDown(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
+  fireEvent.pointerUp(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
+
+  expect(widget).toHaveClass('expanded');
+  expect(container.querySelector('.floating-video-backdrop')).toBeInTheDocument();
+
+  fireEvent.pointerDown(container.querySelector('.floating-video-backdrop'));
+
+  expect(widget).not.toHaveClass('expanded');
+  expect(container.querySelector('.floating-video-backdrop')).not.toBeInTheDocument();
+});
+
+test('AppVideoManager close button hides expanded floating video', () => {
+  const { container } = renderNativeFloatingVideo();
+  const widget = container.querySelector('.floating-video-widget');
+
+  fireEvent.pointerDown(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
+  fireEvent.pointerUp(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
+  fireEvent.click(screen.getByLabelText(/close video/i));
+
+  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+  expect(container.querySelector('.floating-video-backdrop')).not.toBeInTheDocument();
+});
+
+test('AppVideoManager drag movement does not expand floating video', () => {
+  const { container } = renderNativeFloatingVideo();
+  const widget = container.querySelector('.floating-video-widget');
+
+  fireEvent.pointerDown(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
+  fireEvent.pointerMove(widget, { pointerId: 1, clientX: 58, clientY: 40, button: 0 });
+  fireEvent.pointerUp(widget, { pointerId: 1, clientX: 58, clientY: 40, button: 0 });
+
+  expect(widget).not.toHaveClass('expanded');
+  expect(container.querySelector('.floating-video-backdrop')).not.toBeInTheDocument();
 });
