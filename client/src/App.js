@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -40,9 +40,17 @@ const NativeStartRoute = () => {
 };
 
 function AppRoutes() {
+  const { user } = useAuth();
+  const location = useLocation();
+  const isNative = Capacitor.isNativePlatform();
+  const hideNativeAuthChrome =
+    isNative &&
+    !user &&
+    ["/", "/login", "/register/customer", "/register/vendor"].includes(location.pathname);
+
   return (
-    <>
-      <Navbar />
+    <div className={isNative ? `native-app-shell ${user ? "native-with-bottom-nav" : ""}` : undefined}>
+      {!hideNativeAuthChrome && <Navbar />}
       <Routes>
         <Route path="/" element={<NativeStartRoute />} />
         <Route path="/browse" element={<HomePage />} />
@@ -59,8 +67,8 @@ function AppRoutes() {
         <Route path="/dashboard/add-product" element={<PrivateRoute role="vendor"><AddProduct /></PrivateRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <Footer />
-    </>
+      {!isNative && <Footer />}
+    </div>
   );
 }
 

@@ -365,3 +365,357 @@ body {
   .auth-card .auth-body { padding: 1.25rem; }
   .otp-input { width: 40px !important; height: 44px; }
 }
+
+/* Capacitor native shell */
+.native-app-shell {
+  min-height: 100dvh;
+  background: #f8f9fa;
+}
+
+.native-app-shell.native-with-bottom-nav {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+
+.native-app-shell footer {
+  display: none !important;
+}
+
+.native-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 1040;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid rgba(44, 62, 80, 0.08);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.06);
+  padding: calc(0.65rem + env(safe-area-inset-top)) 1rem 0.65rem;
+  backdrop-filter: blur(14px);
+}
+
+.native-topbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.native-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--secondary);
+  font-weight: 850;
+  font-size: 1.15rem;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.native-brand i {
+  color: var(--primary);
+  font-size: 1.25rem;
+}
+
+.native-icon-button {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 107, 53, 0.16);
+  background: #fff8f4;
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.native-icon-button:active,
+.native-icon-button:hover {
+  color: var(--primary-dark);
+  background: #fff1e8;
+}
+
+.native-search-form {
+  margin-top: 0.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f3f5f7;
+  border: 1px solid #e8ecef;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+}
+
+.native-search-form i {
+  color: #7b8794;
+}
+
+.native-search-form input {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  min-width: 0;
+  flex: 1;
+  font-size: 0.95rem;
+}
+
+.native-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1040;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.25rem;
+  padding: 0.45rem 0.75rem calc(0.45rem + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.97);
+  border-top: 1px solid rgba(44, 62, 80, 0.1);
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.native-bottom-nav a {
+  color: #6b7280;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  text-decoration: none;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.35rem 0.15rem;
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.native-bottom-nav i {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.native-bottom-nav a.active {
+  color: var(--primary);
+  background: #fff5f0;
+}
+
+.native-app-shell .auth-wrapper {
+  min-height: 100dvh;
+  padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));
+}
+
+.native-app-shell .auth-card {
+  max-width: 430px;
+  border-radius: 24px;
+}
+
+.native-app-shell .auth-card .auth-header {
+  padding: 2.1rem 1.5rem 1.8rem;
+}
+
+.native-app-shell .auth-card .auth-body {
+  padding: 1.4rem;
+}
+
+.mobile-welcome-wrapper {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.24), transparent 30%),
+    linear-gradient(160deg, #FF6B35 0%, #e55a24 42%, #2C3E50 100%);
+}
+
+.mobile-welcome-card {
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+}
+
+.mobile-welcome-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.mobile-welcome-logo i {
+  font-size: 2.2rem;
+}
+
+.mobile-welcome-actions .btn {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: normal;
+}
+
+.native-app-shell .dashboard-sidebar {
+  min-height: auto;
+}
+
+.native-app-shell .vendor-dashboard-layout {
+  min-height: auto !important;
+  flex-direction: column;
+}
+
+.native-app-shell .vendor-mobile-tabs {
+  top: calc(58px + env(safe-area-inset-top)) !important;
+  background: #fff !important;
+  border-bottom: 1px solid #eef0f2;
+  padding: 0.55rem 0.75rem !important;
+}
+
+.native-app-shell .vendor-mobile-tabs .btn {
+  border-radius: 999px;
+  color: var(--secondary) !important;
+  border-color: #e1e5ea;
+  background: #fff;
+  min-height: 36px;
+}
+
+.native-app-shell .vendor-mobile-tabs .btn-warning {
+  border-color: rgba(255, 107, 53, 0.18);
+  background: #fff5f0;
+  color: var(--primary) !important;
+}
+
+.native-app-shell .vendor-dashboard-content {
+  padding: 1rem !important;
+}
+
+.native-app-shell .vendor-dashboard-header {
+  align-items: flex-start !important;
+}
+
+.native-app-shell .vendor-dashboard-header h4 {
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+.native-app-shell .vendor-stat-grid .stat-card {
+  padding: 1rem;
+  min-height: 108px;
+}
+
+.native-app-shell .vendor-stat-grid .stat-card .fs-3 {
+  font-size: 1.55rem !important;
+}
+
+.native-app-shell .vendor-dashboard-content .card-body {
+  padding: 0.9rem;
+}
+
+.native-app-shell .vendor-products-table {
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--card-shadow);
+}
+
+.native-app-shell .vendor-profile-form {
+  max-width: none !important;
+}
+
+.native-app-shell .add-product-page {
+  padding-top: 1rem !important;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
+}
+
+.native-app-shell .add-product-header {
+  align-items: flex-start !important;
+  gap: 0.75rem !important;
+}
+
+.native-app-shell .add-product-header h4 {
+  font-size: 1.15rem;
+  line-height: 1.25;
+  flex: 1;
+  min-width: 0;
+}
+
+.native-app-shell .add-product-back {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.65rem;
+}
+
+.native-app-shell .add-product-card {
+  border-radius: 16px !important;
+}
+
+.native-app-shell .add-product-card .card-body {
+  padding: 1rem !important;
+}
+
+.native-app-shell .add-product-image-grid {
+  gap: 0.65rem !important;
+}
+
+.native-app-shell .condition-option {
+  min-height: 112px;
+  padding: 0.8rem !important;
+}
+
+.native-app-shell .add-product-submit {
+  position: sticky;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 5;
+  box-shadow: 0 10px 28px rgba(255, 107, 53, 0.28);
+}
+
+@media (max-width: 430px) {
+  .native-topbar {
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+  }
+
+  .native-brand {
+    font-size: 1.05rem;
+  }
+
+  .native-icon-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .native-app-shell .auth-card .auth-body {
+    padding: 1.15rem;
+  }
+
+  .native-app-shell .vendor-dashboard-content {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  .native-app-shell .vendor-stat-grid {
+    --bs-gutter-x: 0.65rem;
+    --bs-gutter-y: 0.65rem;
+  }
+
+  .native-app-shell .vendor-stat-grid .stat-card {
+    padding: 0.85rem;
+  }
+
+  .native-app-shell .vendor-dashboard-content .row.g-3 {
+    --bs-gutter-x: 0.65rem;
+    --bs-gutter-y: 0.65rem;
+  }
+
+  .native-app-shell .vendor-dashboard-content .card-body {
+    padding: 0.75rem;
+  }
+
+  .native-app-shell .vendor-dashboard-content .timer-badge {
+    font-size: 0.68rem;
+  }
+
+  .native-app-shell .add-product-page {
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
+  }
+
+  .native-app-shell .condition-option {
+    min-height: 126px;
+  }
+}

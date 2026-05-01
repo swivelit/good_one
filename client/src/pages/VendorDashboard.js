@@ -103,7 +103,7 @@ export default function VendorDashboard() {
   ];
 
   return (
-    <div className="d-flex" style={{ minHeight: "calc(100vh - 70px)" }}>
+    <div className="d-flex vendor-dashboard-layout" style={{ minHeight: "calc(100vh - 70px)" }}>
       {/* Sidebar */}
       <div
         className="dashboard-sidebar d-none d-lg-block"
@@ -162,7 +162,7 @@ export default function VendorDashboard() {
 
       {/* Mobile Tabs */}
       <div
-        className="d-lg-none w-100 bg-dark px-2 py-1 position-sticky top-0"
+        className="vendor-mobile-tabs d-lg-none w-100 bg-dark px-2 py-1 position-sticky top-0"
         style={{ zIndex: 10 }}
       >
         <div className="d-flex gap-1">
@@ -180,14 +180,14 @@ export default function VendorDashboard() {
       </div>
 
       {/* Content */}
-      <div className="flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
+      <div className="vendor-dashboard-content flex-grow-1 p-3 p-md-4" style={{ minWidth: 0 }}>
         {/* Overview */}
         {activeTab === "overview" && (
           <>
-            <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <div className="vendor-dashboard-header d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
               <div>
-                <h4 className="fw-bold mb-0">
-                  Welcome back, {user.name?.split(" ")[0]}! 👋
+                    <h4 className="fw-bold mb-0">
+                      Welcome back, {user.name?.split(" ")[0]}! 👋
                 </h4>
                 <small className="text-muted">
                   {vendorProfile?.businessName}
@@ -201,7 +201,7 @@ export default function VendorDashboard() {
               </Link>
             </div>
 
-            <div className="row g-3 mb-4">
+            <div className="row g-3 mb-4 vendor-stat-grid">
               {stats.map((s) => (
                 <div key={s.label} className="col-6 col-md-3">
                   <div
@@ -259,7 +259,7 @@ export default function VendorDashboard() {
               {products.slice(0, 6).map((p) => {
                 const timer = getTimeLeft(p.expiresAt);
                 return (
-                  <div key={p._id} className="col-md-6 col-lg-4">
+                  <div key={p._id} className="col-6 col-md-6 col-lg-4">
                     <div
                       className="card border-0 shadow-sm"
                       style={{ borderRadius: 12 }}
@@ -336,7 +336,7 @@ export default function VendorDashboard() {
         {/* Products Tab */}
         {activeTab === "products" && (
           <>
-            <div className="d-flex justify-content-between align-items-center mb-4">
+            <div className="vendor-dashboard-header d-flex justify-content-between align-items-center mb-4 gap-2">
               <h5 className="fw-bold mb-0">My Products</h5>
               <Link
                 to="/dashboard/add-product"
@@ -361,7 +361,7 @@ export default function VendorDashboard() {
                 </Link>
               </div>
             ) : (
-              <div className="table-responsive">
+              <div className="table-responsive vendor-products-table">
                 <table className="table table-hover align-middle">
                   <thead className="table-light">
                     <tr>
@@ -467,7 +467,7 @@ function VendorProfileEdit({ vendorProfile }) {
   };
 
   return (
-    <div style={{ maxWidth: 560 }}>
+    <div className="vendor-profile-form" style={{ maxWidth: 560 }}>
       <h5 className="fw-bold mb-4">Business Profile</h5>
       <form onSubmit={handleSave}>
         {[

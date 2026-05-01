@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { useAuth } from "./AuthContext";
 import toast from "react-hot-toast";
@@ -7,9 +7,14 @@ import toast from "react-hot-toast";
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [search, setSearch] = useState("");
-  const browsePath = Capacitor.isNativePlatform() ? "/browse" : "/";
-  const logoutPath = Capacitor.isNativePlatform() ? "/" : "/login";
+  const isNative = Capacitor.isNativePlatform();
+  const browsePath = isNative ? "/browse" : "/";
+  const logoutPath = isNative ? "/" : "/login";
+  const showNativeSearch =
+    isNative &&
+    ["/browse", "/products"].some((path) => location.pathname.startsWith(path));
 
   const handleLogout = () => {
     logout();
@@ -26,6 +31,93 @@ export default function Navbar() {
       navigate(browsePath);
     }
   };
+
+  if (isNative) {
+    return (
+      <>
+        <header className="native-topbar">
+          <div className="native-topbar-row">
+            <Link className="native-brand" to={user?.role === "vendor" ? "/dashboard" : "/"}>
+              <i className="bi bi-shop-window"></i>
+              <span>GoodOne</span>
+            </Link>
+
+            <div className="d-flex align-items-center gap-2">
+              {!user ? (
+                <Link className="btn btn-primary-custom btn-sm px-3" to="/login">
+                  Sign In
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    className="native-icon-button"
+                    to={user.role === "vendor" ? "/dashboard" : "/browse"}
+                    aria-label={user.role === "vendor" ? "Dashboard" : "Browse"}
+                  >
+                    <i className={`bi ${user.role === "vendor" ? "bi-speedometer2" : "bi-grid"}`}></i>
+                  </Link>
+                  <Link className="native-icon-button" to="/chat" aria-label="Messages">
+                    <i className="bi bi-chat-dots"></i>
+                  </Link>
+                  <button
+                    type="button"
+                    className="native-icon-button"
+                    onClick={handleLogout}
+                    aria-label="Logout"
+                  >
+                    <i className="bi bi-box-arrow-right"></i>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {showNativeSearch && (
+            <form className="native-search-form" onSubmit={handleSearch}>
+              <i className="bi bi-search"></i>
+              <input
+                type="search"
+                placeholder="Search products"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </form>
+          )}
+        </header>
+
+        {user && (
+          <nav className="native-bottom-nav">
+            <Link to="/browse" className={location.pathname === "/browse" ? "active" : ""}>
+              <i className="bi bi-grid"></i>
+              <span>Browse</span>
+            </Link>
+            {user.role === "vendor" && (
+              <>
+                <Link
+                  to="/dashboard"
+                  className={location.pathname === "/dashboard" ? "active" : ""}
+                >
+                  <i className="bi bi-speedometer2"></i>
+                  <span>Dashboard</span>
+                </Link>
+                <Link
+                  to="/dashboard/add-product"
+                  className={location.pathname === "/dashboard/add-product" ? "active" : ""}
+                >
+                  <i className="bi bi-plus-circle"></i>
+                  <span>Add</span>
+                </Link>
+              </>
+            )}
+            <Link to="/chat" className={location.pathname.startsWith("/chat") ? "active" : ""}>
+              <i className="bi bi-chat-dots"></i>
+              <span>Chat</span>
+            </Link>
+          </nav>
+        )}
+      </>
+    );
+  }
 
   return (
     <nav className="navbar navbar-expand-lg navbar-light navbar-custom sticky-top">

@@ -55,9 +55,9 @@ export default function AddProduct() {
   };
 
   return (
-    <div className="container py-4 py-md-5">
-      <div className="d-flex align-items-center gap-3 mb-4">
-        <Link to="/dashboard" className="btn btn-outline-secondary btn-sm">← Back</Link>
+    <div className="container py-4 py-md-5 add-product-page">
+      <div className="add-product-header d-flex align-items-center gap-3 mb-4">
+        <Link to="/dashboard" className="btn btn-outline-secondary btn-sm add-product-back">← Back</Link>
         <h4 className="fw-bold mb-0">Add New Product Listing</h4>
       </div>
 
@@ -70,10 +70,10 @@ export default function AddProduct() {
         <div className="col-lg-8">
           <form onSubmit={handleSubmit}>
             {/* Images */}
-            <div className="card border-0 shadow-sm mb-4" style={{borderRadius:14}}>
+            <div className="card border-0 shadow-sm mb-4 add-product-card" style={{borderRadius:14}}>
               <div className="card-body p-4">
                 <h6 className="fw-bold mb-3"><i className="bi bi-images me-2" style={{color:'#FF6B35'}}></i>Product Images <small className="text-muted fw-normal">(up to 5)</small></h6>
-                <div className="d-flex flex-wrap gap-2 mb-3">
+                <div className="add-product-image-grid d-flex flex-wrap gap-2 mb-3">
                   {previews.map((url, i) => (
                     <div key={i} className="position-relative" style={{width:90,height:90}}>
                       <img src={url} alt="" className="rounded-3 w-100 h-100" style={{objectFit:'cover'}} />
@@ -97,7 +97,7 @@ export default function AddProduct() {
             </div>
 
             {/* Basic Info */}
-            <div className="card border-0 shadow-sm mb-4" style={{borderRadius:14}}>
+            <div className="card border-0 shadow-sm mb-4 add-product-card" style={{borderRadius:14}}>
               <div className="card-body p-4">
                 <h6 className="fw-bold mb-3"><i className="bi bi-info-circle me-2" style={{color:'#FF6B35'}}></i>Product Details</h6>
                 <div className="mb-3">
@@ -142,14 +142,14 @@ export default function AddProduct() {
             </div>
 
             {/* Condition */}
-            <div className="card border-0 shadow-sm mb-4" style={{borderRadius:14}}>
+            <div className="card border-0 shadow-sm mb-4 add-product-card" style={{borderRadius:14}}>
               <div className="card-body p-4">
                 <h6 className="fw-bold mb-3"><i className="bi bi-stars me-2" style={{color:'#FF6B35'}}></i>Product Condition</h6>
                 <div className="row g-2">
                   {CONDITIONS.map(c => (
                     <div key={c.value} className="col-6 col-md-4">
                       <div
-                        className="p-3 rounded-3 cursor-pointer border-2"
+                        className="condition-option p-3 rounded-3 cursor-pointer border-2"
                         style={{
                           cursor:'pointer',
                           border: `2px solid ${form.condition === c.value ? '#FF6B35' : '#dee2e6'}`,
@@ -167,7 +167,7 @@ export default function AddProduct() {
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary-custom btn-lg w-100" disabled={loading}>
+            <button type="submit" className="btn btn-primary-custom btn-lg w-100 add-product-submit" disabled={loading}>
               {loading ? <><span className="spinner-border spinner-border-sm me-2"></span>Publishing...</> : <><i className="bi bi-cloud-upload me-2"></i>Publish Listing (24 Hours)</>}
             </button>
           </form>

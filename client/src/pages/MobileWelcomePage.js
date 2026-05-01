@@ -3,10 +3,12 @@ import { Link } from "react-router-dom";
 
 export default function MobileWelcomePage() {
   return (
-    <div className="auth-wrapper">
-      <div className="auth-card">
+    <div className="auth-wrapper mobile-welcome-wrapper">
+      <div className="auth-card mobile-welcome-card">
         <div className="auth-header">
-          <i className="bi bi-shop-window display-4 mb-2 d-block"></i>
+          <div className="mobile-welcome-logo">
+            <i className="bi bi-shop-window"></i>
+          </div>
           <h1 className="h3 fw-bold mb-2">GoodOne</h1>
           <p className="opacity-80 mb-0">
             Buy & sell directly with verified local vendors
@@ -14,7 +16,7 @@ export default function MobileWelcomePage() {
         </div>
 
         <div className="auth-body">
-          <div className="d-grid gap-3">
+          <div className="d-grid gap-3 mobile-welcome-actions">
             <Link to="/login" className="btn btn-primary-custom py-2">
               <i className="bi bi-box-arrow-in-right me-2"></i>
               Sign In
