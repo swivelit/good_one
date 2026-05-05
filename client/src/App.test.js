@@ -96,6 +96,12 @@ test('AppVideoManager renders splash only in native Capacitor mode', () => {
   expect(container.querySelector('.app-video-splash')).toBeInTheDocument();
 });
 
+const INTRO_TIMEOUT_MS = 4000;
+const POPUP_DELAY_MS = 5000;
+const GOOGLE_AD_CYCLE_MS = 60000;
+const GOOGLE_AD_CYCLES_BEFORE_LOCAL_VIDEO = 5;
+const LOCAL_VIDEO_DURATION_MS = 3000;
+
 const flushPromises = async () => {
   for (let index = 0; index < 5; index += 1) {
     await Promise.resolve();
@@ -109,34 +115,39 @@ const advanceTimers = async (milliseconds) => {
   });
 };
 
-const renderNativeFloatingVideo = async () => {
+const renderNativeVideoManager = () => {
   jest.useFakeTimers();
   Capacitor.isNativePlatform.mockReturnValue(true);
 
-  const view = render(<AppVideoManager />);
+  return render(<AppVideoManager />);
+};
 
-  await advanceTimers(4000);
-  await advanceTimers(5000);
+const renderNativeAdPhase = async () => {
+  const view = renderNativeVideoManager();
+
+  await advanceTimers(INTRO_TIMEOUT_MS);
+  await advanceTimers(POPUP_DELAY_MS);
 
   return view;
 };
 
-test('AppVideoManager renders floating video after splash and five second native delay', async () => {
-  const { container } = await renderNativeFloatingVideo();
+const advanceAdCycles = async (cycleCount) => {
+  for (let index = 0; index < cycleCount; index += 1) {
+    await advanceTimers(GOOGLE_AD_CYCLE_MS);
+  }
+};
 
-  expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
-  expect(screen.queryByLabelText(/close video/i)).not.toBeInTheDocument();
-});
+const renderNativeLocalVideoPhase = async () => {
+  const view = await renderNativeAdPhase();
 
-test('AppVideoManager hides video after three seconds and shows AdMob banner', async () => {
-  const { container } = await renderNativeFloatingVideo();
+  await advanceAdCycles(GOOGLE_AD_CYCLES_BEFORE_LOCAL_VIDEO);
 
-  expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
-  expect(AdMob.showBanner).not.toHaveBeenCalled();
+  return view;
+};
 
-  await advanceTimers(3000);
+test('AppVideoManager starts AdMob after splash and popup delay', async () => {
+  const { container } = await renderNativeAdPhase();
 
-  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
   expect(AdMob.showBanner).toHaveBeenCalledWith(
     expect.objectContaining({
       adId: 'ca-app-pub-9859771616835832/2509706314',
@@ -146,25 +157,42 @@ test('AppVideoManager hides video after three seconds and shows AdMob banner', a
       isTesting: true,
     })
   );
+  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
 });
 
-test('AppVideoManager shows floating video again after the banner phase', async () => {
-  const { container } = await renderNativeFloatingVideo();
+test('AppVideoManager keeps local video hidden after four AdMob cycles', async () => {
+  const { container } = await renderNativeAdPhase();
 
-  await advanceTimers(3000);
+  await advanceAdCycles(GOOGLE_AD_CYCLES_BEFORE_LOCAL_VIDEO - 1);
+
   expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+  expect(AdMob.removeBanner).not.toHaveBeenCalled();
+});
 
-  await advanceTimers(57000);
+test('AppVideoManager shows local video after the fifth AdMob cycle', async () => {
+  const { container } = await renderNativeAdPhase();
+
+  await advanceAdCycles(GOOGLE_AD_CYCLES_BEFORE_LOCAL_VIDEO);
+
+  expect(AdMob.removeBanner).toHaveBeenCalled();
+  expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
+  expect(screen.queryByLabelText(/close video/i)).not.toBeInTheDocument();
+});
+
+test('AppVideoManager returns to AdMob after three seconds of local video', async () => {
+  const { container } = await renderNativeLocalVideoPhase();
+  const adMobShowCount = AdMob.showBanner.mock.calls.length;
 
   expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
-  expect(AdMob.hideBanner).toHaveBeenCalled();
+
+  await advanceTimers(LOCAL_VIDEO_DURATION_MS);
+
+  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+  expect(AdMob.showBanner).toHaveBeenCalledTimes(adMobShowCount + 1);
 });
 
 test('AppVideoManager clears timers on unmount', () => {
-  jest.useFakeTimers();
-  Capacitor.isNativePlatform.mockReturnValue(true);
-
-  const { unmount } = render(<AppVideoManager />);
+  const { unmount } = renderNativeVideoManager();
 
   expect(jest.getTimerCount()).toBeGreaterThan(0);
 
@@ -173,8 +201,19 @@ test('AppVideoManager clears timers on unmount', () => {
   expect(jest.getTimerCount()).toBe(0);
 });
 
+test('AppVideoManager stops the AdMob cycle on unmount', async () => {
+  const { unmount } = await renderNativeAdPhase();
+  const adMobShowCount = AdMob.showBanner.mock.calls.length;
+
+  unmount();
+  await advanceTimers(GOOGLE_AD_CYCLE_MS * GOOGLE_AD_CYCLES_BEFORE_LOCAL_VIDEO);
+
+  expect(AdMob.showBanner).toHaveBeenCalledTimes(adMobShowCount);
+  expect(AdMob.removeBanner).toHaveBeenCalled();
+});
+
 test('AppVideoManager expands floating video on tap and collapses from backdrop', async () => {
-  const { container } = await renderNativeFloatingVideo();
+  const { container } = await renderNativeLocalVideoPhase();
   const widget = container.querySelector('.floating-video-widget');
 
   fireEvent.pointerDown(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
@@ -190,7 +229,7 @@ test('AppVideoManager expands floating video on tap and collapses from backdrop'
 });
 
 test('AppVideoManager has no close button after expanding floating video', async () => {
-  const { container } = await renderNativeFloatingVideo();
+  const { container } = await renderNativeLocalVideoPhase();
   const widget = container.querySelector('.floating-video-widget');
 
   fireEvent.pointerDown(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
@@ -201,7 +240,7 @@ test('AppVideoManager has no close button after expanding floating video', async
 });
 
 test('AppVideoManager drag movement does not expand floating video', async () => {
-  const { container } = await renderNativeFloatingVideo();
+  const { container } = await renderNativeLocalVideoPhase();
   const widget = container.querySelector('.floating-video-widget');
 
   fireEvent.pointerDown(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
