@@ -1,8 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import {
+  hideAdMobBanner,
+  removeAdMobBanner,
+  showAdMobBanner,
+} from "../services/admob";
 
 const INTRO_TIMEOUT_MS = 4000;
 const POPUP_DELAY_MS = 5000;
+const FLOATING_VIDEO_VISIBLE_MS = 3000;
+const ADMOB_BANNER_VISIBLE_MS = 57000;
 const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
 const DEFAULT_BOTTOM_OFFSET = 90;
@@ -49,6 +56,9 @@ export default function AppVideoManager() {
   const [isExpanded, setIsExpanded] = useState(false);
   const splashTimerRef = useRef(null);
   const popupTimerRef = useRef(null);
+  const cycleTimerRef = useRef(null);
+  const startVideoPhaseRef = useRef(() => {});
+  const startBannerPhaseRef = useRef(() => {});
   const widgetRef = useRef(null);
   const dragRef = useRef(null);
 
@@ -111,6 +121,13 @@ export default function AppVideoManager() {
     return getDefaultPosition();
   }, [clampPosition, getDefaultPosition]);
 
+  const clearSplashTimer = useCallback(() => {
+    if (splashTimerRef.current) {
+      clearTimeout(splashTimerRef.current);
+      splashTimerRef.current = null;
+    }
+  }, []);
+
   const clearPopupTimer = useCallback(() => {
     if (popupTimerRef.current) {
       clearTimeout(popupTimerRef.current);
@@ -118,27 +135,93 @@ export default function AppVideoManager() {
     }
   }, []);
 
-  const hideSplash = useCallback(() => {
-    if (splashTimerRef.current) {
-      clearTimeout(splashTimerRef.current);
-      splashTimerRef.current = null;
+  const clearCycleTimer = useCallback(() => {
+    if (cycleTimerRef.current) {
+      clearTimeout(cycleTimerRef.current);
+      cycleTimerRef.current = null;
     }
-    setShowSplash(false);
   }, []);
 
-  const scheduleFloatingPopup = useCallback(() => {
+  const clearCycleTimers = useCallback(() => {
     clearPopupTimer();
-    if (!isNative || showSplash || showFloating) return;
+    clearCycleTimer();
+  }, [clearCycleTimer, clearPopupTimer]);
+
+  const resetFloatingInteraction = useCallback(() => {
+    setIsExpanded(false);
+    setIsDragging(false);
+    dragRef.current = null;
+  }, []);
+
+  const hideSplash = useCallback(() => {
+    clearSplashTimer();
+    setShowSplash(false);
+  }, [clearSplashTimer]);
+
+  const scheduleSplashTimeout = useCallback(() => {
+    clearSplashTimer();
+    if (!isNative || !showSplash || document.visibilityState !== "visible") return;
+
+    splashTimerRef.current = setTimeout(hideSplash, INTRO_TIMEOUT_MS);
+  }, [clearSplashTimer, hideSplash, isNative, showSplash]);
+
+  const showVideoPhase = useCallback(() => {
+    clearCycleTimer();
+    if (!isNative || document.visibilityState !== "visible") return;
+
+    void hideAdMobBanner();
+    resetFloatingInteraction();
+    setFloatingPosition(loadPosition());
+    setShowFloating(true);
+
+    cycleTimerRef.current = setTimeout(() => {
+      cycleTimerRef.current = null;
+      startBannerPhaseRef.current();
+    }, FLOATING_VIDEO_VISIBLE_MS);
+  }, [clearCycleTimer, isNative, loadPosition, resetFloatingInteraction]);
+
+  const showBannerPhase = useCallback(() => {
+    clearCycleTimer();
+    if (!isNative || document.visibilityState !== "visible") return;
+
+    resetFloatingInteraction();
+    setShowFloating(false);
+    void showAdMobBanner();
+
+    cycleTimerRef.current = setTimeout(() => {
+      cycleTimerRef.current = null;
+      startVideoPhaseRef.current();
+    }, ADMOB_BANNER_VISIBLE_MS);
+  }, [clearCycleTimer, isNative, resetFloatingInteraction]);
+
+  useEffect(() => {
+    startVideoPhaseRef.current = showVideoPhase;
+  }, [showVideoPhase]);
+
+  useEffect(() => {
+    startBannerPhaseRef.current = showBannerPhase;
+  }, [showBannerPhase]);
+
+  const scheduleFloatingPopup = useCallback(() => {
+    clearCycleTimers();
+    if (!isNative || showSplash) return;
     if (document.visibilityState !== "visible") return;
 
     popupTimerRef.current = setTimeout(() => {
       popupTimerRef.current = null;
       if (document.visibilityState === "visible") {
-        setFloatingPosition(loadPosition());
-        setShowFloating(true);
+        startVideoPhaseRef.current();
       }
     }, POPUP_DELAY_MS);
-  }, [clearPopupTimer, isNative, loadPosition, showFloating, showSplash]);
+  }, [clearCycleTimers, isNative, showSplash]);
+
+  const stopNativeVideoCycle = useCallback(() => {
+    clearSplashTimer();
+    clearCycleTimers();
+    resetFloatingInteraction();
+    setShowFloating(false);
+    void removeAdMobBanner();
+  }, [clearCycleTimers, clearSplashTimer, resetFloatingInteraction]);
 
   const handlePointerDown = useCallback((event) => {
     if (isExpanded || !floatingPosition || event.button > 0) return;
@@ -197,33 +280,29 @@ export default function AppVideoManager() {
   useEffect(() => {
     if (!isNative) return undefined;
 
-    splashTimerRef.current = setTimeout(hideSplash, INTRO_TIMEOUT_MS);
-
-    return () => {
-      if (splashTimerRef.current) clearTimeout(splashTimerRef.current);
-    };
-  }, [hideSplash, isNative]);
+    scheduleSplashTimeout();
+    return clearSplashTimer;
+  }, [clearSplashTimer, isNative, scheduleSplashTimeout]);
 
   useEffect(() => {
-    if (!isNative || showSplash || showFloating) return undefined;
+    if (!isNative || showSplash) return undefined;
 
     scheduleFloatingPopup();
-    return clearPopupTimer;
-  }, [clearPopupTimer, isNative, scheduleFloatingPopup, showFloating, showSplash]);
+    return clearCycleTimers;
+  }, [clearCycleTimers, isNative, scheduleFloatingPopup, showSplash]);
 
   useEffect(() => {
     if (!isNative) return undefined;
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        clearPopupTimer();
-        setIsExpanded(false);
-        setIsDragging(false);
-        dragRef.current = null;
+        stopNativeVideoCycle();
         return;
       }
 
-      if (!showSplash && !showFloating) {
+      if (showSplash) {
+        scheduleSplashTimeout();
+      } else {
         scheduleFloatingPopup();
       }
     };
@@ -231,9 +310,24 @@ export default function AppVideoManager() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      clearPopupTimer();
     };
-  }, [clearPopupTimer, isNative, scheduleFloatingPopup, showFloating, showSplash]);
+  }, [
+    isNative,
+    scheduleFloatingPopup,
+    scheduleSplashTimeout,
+    showSplash,
+    stopNativeVideoCycle,
+  ]);
+
+  useEffect(() => {
+    if (!isNative) return undefined;
+
+    return () => {
+      clearSplashTimer();
+      clearCycleTimers();
+      void removeAdMobBanner();
+    };
+  }, [clearCycleTimers, clearSplashTimer, isNative]);
 
   useEffect(() => {
     if (!isNative) return undefined;
