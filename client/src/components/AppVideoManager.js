@@ -7,9 +7,9 @@ import {
 
 const INTRO_TIMEOUT_MS = 4000;
 const POPUP_DELAY_MS = 5000;
-const GOOGLE_AD_CYCLE_MS = 60000;
-const GOOGLE_AD_CYCLES_BEFORE_LOCAL_VIDEO = 5;
+const ONE_MINUTE_AD_LOOP_MS = 60000;
 const LOCAL_VIDEO_DURATION_MS = 3000;
+const GOOGLE_AD_DURATION_MS = ONE_MINUTE_AD_LOOP_MS - LOCAL_VIDEO_DURATION_MS;
 const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
 const DEFAULT_BOTTOM_OFFSET = 90;
@@ -57,7 +57,6 @@ export default function AppVideoManager() {
   const splashTimerRef = useRef(null);
   const popupTimerRef = useRef(null);
   const cycleTimerRef = useRef(null);
-  const googleAdCycleCountRef = useRef(0);
   const showAdMobPhaseRef = useRef(() => {});
   const showLocalVideoPhaseRef = useRef(() => {});
   const widgetRef = useRef(null);
@@ -176,16 +175,8 @@ export default function AppVideoManager() {
 
     cycleTimerRef.current = setTimeout(() => {
       cycleTimerRef.current = null;
-      googleAdCycleCountRef.current += 1;
-
-      if (googleAdCycleCountRef.current >= GOOGLE_AD_CYCLES_BEFORE_LOCAL_VIDEO) {
-        googleAdCycleCountRef.current = 0;
-        showLocalVideoPhaseRef.current();
-        return;
-      }
-
-      showAdMobPhaseRef.current();
-    }, GOOGLE_AD_CYCLE_MS);
+      showLocalVideoPhaseRef.current();
+    }, GOOGLE_AD_DURATION_MS);
   }, [clearCycleTimer, isNative, resetFloatingInteraction]);
 
   const showLocalVideoPhase = useCallback(() => {
@@ -220,7 +211,7 @@ export default function AppVideoManager() {
     popupTimerRef.current = setTimeout(() => {
       popupTimerRef.current = null;
       if (document.visibilityState === "visible") {
-        showAdMobPhaseRef.current();
+        showLocalVideoPhaseRef.current();
       }
     }, POPUP_DELAY_MS);
   }, [clearCycleTimers, isNative, showSplash]);
@@ -228,7 +219,6 @@ export default function AppVideoManager() {
   const stopNativeVideoCycle = useCallback(() => {
     clearSplashTimer();
     clearCycleTimers();
-    googleAdCycleCountRef.current = 0;
     resetFloatingInteraction();
     setShowFloating(false);
     void removeAdMobBanner();
@@ -336,7 +326,6 @@ export default function AppVideoManager() {
     return () => {
       clearSplashTimer();
       clearCycleTimers();
-      googleAdCycleCountRef.current = 0;
       setShowFloating(false);
       void removeAdMobBanner();
     };

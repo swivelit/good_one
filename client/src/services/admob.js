@@ -1,6 +1,9 @@
 import { Capacitor } from "@capacitor/core";
 
-const ADMOB_BANNER_AD_UNIT_ID = "ca-app-pub-9859771616835832/2509706314";
+const ADMOB_BANNER_AD_UNIT_IDS = {
+  android: "ca-app-pub-9859771616835832/2509706314",
+  ios: "ca-app-pub-9859771616835832/9324413170",
+};
 const BANNER_BOTTOM_MARGIN_PX = 72;
 const USE_TEST_ADS = process.env.NODE_ENV !== "production";
 
@@ -9,6 +12,11 @@ let initializationPromise = null;
 let isInitialized = false;
 
 const isNativePlatform = () => Capacitor.isNativePlatform();
+
+export const getAdMobBannerAdUnitId = () => {
+  const platform = Capacitor.getPlatform();
+  return ADMOB_BANNER_AD_UNIT_IDS[platform] || ADMOB_BANNER_AD_UNIT_IDS.android;
+};
 
 const logAdMobError = (action, error) => {
   console.warn(`[AdMob] ${action} failed`, error);
@@ -65,7 +73,7 @@ export const showAdMobBanner = async () => {
     if (!admobModule || !initialized) return false;
 
     await admobModule.AdMob.showBanner({
-      adId: ADMOB_BANNER_AD_UNIT_ID,
+      adId: getAdMobBannerAdUnitId(),
       adSize: admobModule.BannerAdSize.ADAPTIVE_BANNER,
       position: admobModule.BannerAdPosition.BOTTOM_CENTER,
       margin: BANNER_BOTTOM_MARGIN_PX,

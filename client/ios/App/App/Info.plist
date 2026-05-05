@@ -20,12 +20,23 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-9859771616835832~8579367204</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>GoodOne needs camera access for vendor live photo verification.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>GoodOne needs photo library access so vendors can upload product images.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>GoodOne uses this identifier to deliver personalized ads.</string>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>cstr6suwn9.skadnetwork</string>
+		</dict>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
