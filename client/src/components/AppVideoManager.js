@@ -14,8 +14,7 @@ const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
 const DEFAULT_BOTTOM_OFFSET = 90;
 const DRAG_THRESHOLD_PX = 7;
-const PUBLIC_URL = (process.env.PUBLIC_URL || "").replace(/\/$/, "");
-const VIDEO_SRC = `${PUBLIC_URL}/media/goodone-intro.mp4`;
+const VIDEO_SRC = "/media/goodone-intro.mp4";
 
 const getWindowSize = () => ({
   width: window.visualViewport?.width || window.innerWidth,

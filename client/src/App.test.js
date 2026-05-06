@@ -146,10 +146,39 @@ const expectLastBannerAdId = (adId) => {
       adId,
       adSize: 'ADAPTIVE_BANNER',
       position: 'BOTTOM_CENTER',
-      margin: expect.any(Number),
+      margin: 72,
       isTesting: true,
     })
   );
+};
+
+const showBannerWithIsolatedAdMobEnv = async (envValue) => {
+  const previousEnvValue = process.env.REACT_APP_USE_ADMOB_TEST_ADS;
+
+  if (envValue === undefined) {
+    delete process.env.REACT_APP_USE_ADMOB_TEST_ADS;
+  } else {
+    process.env.REACT_APP_USE_ADMOB_TEST_ADS = envValue;
+  }
+
+  jest.resetModules();
+  const { Capacitor: isolatedCapacitor } = require('@capacitor/core');
+  const { AdMob: isolatedAdMob } = require('@capacitor-community/admob');
+  isolatedCapacitor.isNativePlatform.mockReturnValue(true);
+  isolatedCapacitor.getPlatform.mockReturnValue('android');
+  isolatedAdMob.initialize.mockClear();
+  isolatedAdMob.showBanner.mockClear();
+
+  const { showAdMobBanner } = require('./services/admob');
+  await showAdMobBanner();
+
+  if (previousEnvValue === undefined) {
+    delete process.env.REACT_APP_USE_ADMOB_TEST_ADS;
+  } else {
+    process.env.REACT_APP_USE_ADMOB_TEST_ADS = previousEnvValue;
+  }
+
+  return isolatedAdMob;
 };
 
 test('AppVideoManager shows local video after splash and popup delay', async () => {
@@ -191,7 +220,11 @@ test('AppVideoManager returns to local video after the AdMob phase', async () =>
 
   expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
 
-  await advanceTimers(GOOGLE_AD_DURATION_MS);
+  await advanceTimers(GOOGLE_AD_DURATION_MS - 1);
+
+  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+
+  await advanceTimers(1);
 
   expect(AdMob.removeBanner).toHaveBeenCalledTimes(removeBannerCount + 1);
   expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
@@ -248,4 +281,30 @@ test('AppVideoManager drag movement does not expand floating video', async () =>
 
   expect(widget).not.toHaveClass('expanded');
   expect(container.querySelector('.floating-video-backdrop')).not.toBeInTheDocument();
+});
+
+test('REACT_APP_USE_ADMOB_TEST_ADS defaults to true', async () => {
+  const isolatedAdMob = await showBannerWithIsolatedAdMobEnv(undefined);
+
+  expect(isolatedAdMob.initialize).toHaveBeenCalledWith({
+    initializeForTesting: true,
+  });
+  expect(isolatedAdMob.showBanner).toHaveBeenCalledWith(
+    expect.objectContaining({
+      isTesting: true,
+    })
+  );
+});
+
+test('REACT_APP_USE_ADMOB_TEST_ADS=false makes showBanner use isTesting:false', async () => {
+  const isolatedAdMob = await showBannerWithIsolatedAdMobEnv('false');
+
+  expect(isolatedAdMob.initialize).toHaveBeenCalledWith({
+    initializeForTesting: false,
+  });
+  expect(isolatedAdMob.showBanner).toHaveBeenCalledWith(
+    expect.objectContaining({
+      isTesting: false,
+    })
+  );
 });
