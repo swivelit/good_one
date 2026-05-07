@@ -12,8 +12,8 @@ const INTRO_TIMEOUT_MS = LOCAL_VIDEO_DURATION_MS;
 const GOOGLE_AD_DURATION_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
 const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
-const BOTTOM_AD_RESERVED_PX = 96;
-const DEFAULT_BOTTOM_OFFSET = BOTTOM_AD_RESERVED_PX + EDGE_GAP;
+const BOTTOM_AD_RESERVED_PX = 50;
+const DEFAULT_BOTTOM_NAV_RESERVED_PX = 76;
 const DRAG_THRESHOLD_PX = 7;
 const VIDEO_SRC = "/media/goodone-intro.mp4";
 
@@ -47,6 +47,20 @@ const getSafeAreaInsets = () => {
   return insets;
 };
 
+const getNativeBottomNavHeight = () => {
+  if (typeof document === "undefined") return DEFAULT_BOTTOM_NAV_RESERVED_PX;
+
+  const bottomNav = document.querySelector(".native-bottom-nav");
+  const bottomNavHeight = bottomNav?.getBoundingClientRect?.().height;
+  return Number.isFinite(bottomNavHeight) && bottomNavHeight > 0
+    ? bottomNavHeight
+    : DEFAULT_BOTTOM_NAV_RESERVED_PX;
+};
+
+const getNativeBottomChromeReservedHeight = () => (
+  BOTTOM_AD_RESERVED_PX + getNativeBottomNavHeight()
+);
+
 export default function AppVideoManager() {
   const isNative = Capacitor.isNativePlatform();
   const [showSplash, setShowSplash] = useState(isNative);
@@ -79,11 +93,12 @@ export default function AppVideoManager() {
     const { width: viewportWidth, height: viewportHeight } = getWindowSize();
     const { width, height } = getWidgetSize();
     const safe = getSafeAreaInsets();
+    const bottomReservedHeight = getNativeBottomChromeReservedHeight();
 
     const minLeft = EDGE_GAP + safe.left;
     const minTop = EDGE_GAP + safe.top;
     const maxLeft = Math.max(minLeft, viewportWidth - width - EDGE_GAP - safe.right);
-    const maxTop = Math.max(minTop, viewportHeight - height - EDGE_GAP - safe.bottom - BOTTOM_AD_RESERVED_PX);
+    const maxTop = Math.max(minTop, viewportHeight - height - EDGE_GAP - safe.bottom - bottomReservedHeight);
 
     return {
       left: Math.min(Math.max(position.left, minLeft), maxLeft),
@@ -95,10 +110,11 @@ export default function AppVideoManager() {
     const { width: viewportWidth, height: viewportHeight } = getWindowSize();
     const { width, height } = getWidgetSize();
     const safe = getSafeAreaInsets();
+    const bottomReservedHeight = getNativeBottomChromeReservedHeight();
 
     return clampPosition({
       left: viewportWidth - width - EDGE_GAP - safe.right,
-      top: viewportHeight - height - DEFAULT_BOTTOM_OFFSET - safe.bottom,
+      top: viewportHeight - height - bottomReservedHeight - EDGE_GAP - safe.bottom,
     });
   }, [clampPosition, getWidgetSize]);
 

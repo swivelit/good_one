@@ -17,6 +17,13 @@ The debug APK uses:
 
 Wait until the 10-second full-screen video finishes. The banner request starts after that.
 
+Expected layout on the phone:
+
+- the Google test banner sits at the physical bottom of the app WebView
+- the GoodOne bottom tab bar sits directly above the banner
+- the banner must not cover the Browse / Chat / Profile tabs
+- the floating video popup must stay above both the bottom tab bar and the banner
+
 ## Watch AdMob logs
 
 In another terminal:
