@@ -15,15 +15,27 @@ jest.mock('@capacitor/core', () => ({
 jest.mock('@capacitor-community/admob', () => ({
   AdMob: {
     initialize: jest.fn(() => Promise.resolve()),
+    requestConsentInfo: jest.fn(() => Promise.resolve({ canRequestAds: true })),
+    showConsentForm: jest.fn(() => Promise.resolve({ canRequestAds: true })),
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
     showBanner: jest.fn(() => Promise.resolve()),
     hideBanner: jest.fn(() => Promise.resolve()),
     removeBanner: jest.fn(() => Promise.resolve()),
   },
   BannerAdSize: {
     ADAPTIVE_BANNER: 'ADAPTIVE_BANNER',
+    BANNER: 'BANNER',
   },
   BannerAdPosition: {
     BOTTOM_CENTER: 'BOTTOM_CENTER',
+  },
+  BannerAdPluginEvents: {
+    Loaded: 'Loaded',
+    FailedToLoad: 'FailedToLoad',
+    SizeChanged: 'SizeChanged',
+  },
+  AdmobConsentStatus: {
+    REQUIRED: 'REQUIRED',
   },
 }));
 
@@ -103,10 +115,10 @@ test('AppVideoManager renders splash only in native Capacitor mode', () => {
   expect(container.querySelector('.app-video-splash')).toBeInTheDocument();
 });
 
-const ONE_MINUTE_AD_LOOP_MS = 60000;
+const POPUP_REPEAT_INTERVAL_MS = 20000;
 const LOCAL_VIDEO_DURATION_MS = 10000;
 const INTRO_TIMEOUT_MS = LOCAL_VIDEO_DURATION_MS;
-const GOOGLE_AD_DURATION_MS = ONE_MINUTE_AD_LOOP_MS - LOCAL_VIDEO_DURATION_MS;
+const GOOGLE_AD_DURATION_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
 
 const flushPromises = async () => {
   for (let index = 0; index < 5; index += 1) {
@@ -146,7 +158,7 @@ const expectLastBannerAdId = (adId) => {
   expect(AdMob.showBanner).toHaveBeenLastCalledWith(
     expect.objectContaining({
       adId,
-      adSize: 'ADAPTIVE_BANNER',
+      adSize: 'BANNER',
       position: 'BOTTOM_CENTER',
       margin: 0,
       isTesting: true,
@@ -169,6 +181,9 @@ const showBannerWithIsolatedAdMobEnv = async (envValue) => {
   isolatedCapacitor.isNativePlatform.mockReturnValue(true);
   isolatedCapacitor.getPlatform.mockReturnValue('android');
   isolatedAdMob.initialize.mockClear();
+  isolatedAdMob.requestConsentInfo.mockClear();
+  isolatedAdMob.showConsentForm.mockClear();
+  isolatedAdMob.addListener.mockClear();
   isolatedAdMob.showBanner.mockClear();
 
   const { showAdMobBanner } = require('./services/admob');
@@ -188,16 +203,16 @@ test('AppVideoManager shows AdMob after the 10-second launch video', async () =>
 
   expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
   expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
-  expectLastBannerAdId('ca-app-pub-9859771616835832/2509706314');
+  expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
 });
 
-test('AppVideoManager shows local popup video after the 50-second AdMob phase while keeping the bottom banner', async () => {
+test('AppVideoManager shows local popup video after the 10-second AdMob phase while keeping the bottom banner', async () => {
   const { container } = await renderNativeLocalVideoPhase();
 
   expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
   expect(screen.queryByLabelText(/close video/i)).not.toBeInTheDocument();
   expect(AdMob.removeBanner).not.toHaveBeenCalled();
-  expectLastBannerAdId('ca-app-pub-9859771616835832/2509706314');
+  expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
 });
 
 test('AppVideoManager returns to AdMob after 10 seconds of local popup video', async () => {
@@ -208,21 +223,21 @@ test('AppVideoManager returns to AdMob after 10 seconds of local popup video', a
   await advanceTimers(LOCAL_VIDEO_DURATION_MS);
 
   expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
-  expectLastBannerAdId('ca-app-pub-9859771616835832/2509706314');
+  expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
 });
 
-test('AppVideoManager uses the Android banner ad unit by default', async () => {
+test('AppVideoManager uses the Android Google demo banner ad unit by default', async () => {
   await renderNativeAdMobPhase();
 
-  expectLastBannerAdId('ca-app-pub-9859771616835832/2509706314');
+  expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
 });
 
-test('AppVideoManager uses the iOS banner ad unit on iOS', async () => {
+test('AppVideoManager uses the iOS Google demo banner ad unit on iOS', async () => {
   Capacitor.getPlatform.mockReturnValue('ios');
 
   await renderNativeAdMobPhase();
 
-  expectLastBannerAdId('ca-app-pub-9859771616835832/9324413170');
+  expectLastBannerAdId('ca-app-pub-3940256099942544/2934735716');
 });
 
 test('AppVideoManager returns to local video after the AdMob phase without removing the bottom banner', async () => {
@@ -239,7 +254,7 @@ test('AppVideoManager returns to local video after the AdMob phase without remov
 
   expect(AdMob.removeBanner).toHaveBeenCalledTimes(removeBannerCount);
   expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
-  expectLastBannerAdId('ca-app-pub-9859771616835832/2509706314');
+  expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
 });
 
 test('AppVideoManager clears timers and removes banner on unmount', async () => {
@@ -345,12 +360,13 @@ test('REACT_APP_USE_ADMOB_TEST_ADS defaults to true', async () => {
   });
   expect(isolatedAdMob.showBanner).toHaveBeenCalledWith(
     expect.objectContaining({
+      adId: 'ca-app-pub-3940256099942544/6300978111',
       isTesting: true,
     })
   );
 });
 
-test('REACT_APP_USE_ADMOB_TEST_ADS=false makes showBanner use isTesting:false', async () => {
+test('REACT_APP_USE_ADMOB_TEST_ADS=false makes showBanner use production ads and isTesting:false', async () => {
   const isolatedAdMob = await showBannerWithIsolatedAdMobEnv('false');
 
   expect(isolatedAdMob.initialize).toHaveBeenCalledWith({
@@ -358,6 +374,7 @@ test('REACT_APP_USE_ADMOB_TEST_ADS=false makes showBanner use isTesting:false', 
   });
   expect(isolatedAdMob.showBanner).toHaveBeenCalledWith(
     expect.objectContaining({
+      adId: 'ca-app-pub-9859771616835832/2509706314',
       isTesting: false,
     })
   );

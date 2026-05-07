@@ -8,6 +8,23 @@ if (hasReleaseSigningConfig) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+def requireReleaseSigningConfig = { ->
+    if (!hasReleaseSigningConfig) {
+        throw new GradleException("Missing android/key.properties. Copy android/key.properties.example to android/key.properties, generate an upload keystore, fill storeFile/storePassword/keyAlias/keyPassword, then rebuild the release AAB.")
+    }
+
+    ["storeFile", "storePassword", "keyAlias", "keyPassword"].each { propertyName ->
+        if (!keystoreProperties[propertyName]) {
+            throw new GradleException("android/key.properties is missing required property: ${propertyName}")
+        }
+    }
+
+    def releaseStoreFile = file(keystoreProperties["storeFile"])
+    if (!releaseStoreFile.exists()) {
+        throw new GradleException("Release keystore file not found: ${releaseStoreFile}")
+    }
+}
+
 android {
     namespace "com.goodone.marketplace"
     compileSdk rootProject.ext.compileSdkVersion
@@ -42,6 +59,12 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+tasks.matching { task -> task.name in ["assembleRelease", "bundleRelease"] }.configureEach {
+    doFirst {
+        requireReleaseSigningConfig()
     }
 }
 

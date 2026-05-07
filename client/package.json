@@ -41,7 +41,12 @@
     "assets:prepare": "node scripts/generate-app-icons-from-logo.js",
     "assets:generate": "npm run assets:prepare && capacitor-assets generate --android --ios",
     "assets:generate:android": "npm run assets:prepare && capacitor-assets generate --android",
-    "assets:generate:ios": "npm run assets:prepare && capacitor-assets generate --ios"
+    "assets:generate:ios": "npm run assets:prepare && capacitor-assets generate --ios",
+    "build:android:debug": "REACT_APP_USE_ADMOB_TEST_ADS=true npm run build && cap sync android && cd android && ./gradlew assembleDebug",
+    "build:android:release": "REACT_APP_USE_ADMOB_TEST_ADS=false npm run build && cap sync android && cd android && ./gradlew bundleRelease",
+    "verify:android:release": "cd android && ./gradlew bundleRelease && jarsigner -verify -certs app/build/outputs/bundle/release/app-release.aab",
+    "audit:prod": "npm audit --omit=dev",
+    "audit:all": "npm audit"
   },
   "eslintConfig": {
     "extends": [
