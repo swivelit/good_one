@@ -52,6 +52,10 @@ beforeEach(() => {
   jest.clearAllMocks();
   Capacitor.isNativePlatform.mockReturnValue(false);
   Capacitor.getPlatform.mockReturnValue('android');
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    get: () => 'visible',
+  });
   localStorage.clear();
 });
 
@@ -98,10 +102,9 @@ test('AppVideoManager renders splash only in native Capacitor mode', () => {
   expect(container.querySelector('.app-video-splash')).toBeInTheDocument();
 });
 
-const INTRO_TIMEOUT_MS = 4000;
-const POPUP_DELAY_MS = 5000;
 const ONE_MINUTE_AD_LOOP_MS = 60000;
-const LOCAL_VIDEO_DURATION_MS = 3000;
+const LOCAL_VIDEO_DURATION_MS = 10000;
+const INTRO_TIMEOUT_MS = LOCAL_VIDEO_DURATION_MS;
 const GOOGLE_AD_DURATION_MS = ONE_MINUTE_AD_LOOP_MS - LOCAL_VIDEO_DURATION_MS;
 
 const flushPromises = async () => {
@@ -124,19 +127,17 @@ const renderNativeVideoManager = () => {
   return render(<AppVideoManager />);
 };
 
-const renderNativeLocalVideoPhase = async () => {
+const renderNativeAdMobPhase = async () => {
   const view = renderNativeVideoManager();
 
   await advanceTimers(INTRO_TIMEOUT_MS);
-  await advanceTimers(POPUP_DELAY_MS);
-
   return view;
 };
 
-const renderNativeAdMobPhase = async () => {
-  const view = await renderNativeLocalVideoPhase();
+const renderNativeLocalVideoPhase = async () => {
+  const view = await renderNativeAdMobPhase();
 
-  await advanceTimers(LOCAL_VIDEO_DURATION_MS);
+  await advanceTimers(GOOGLE_AD_DURATION_MS);
   return view;
 };
 
@@ -181,15 +182,22 @@ const showBannerWithIsolatedAdMobEnv = async (envValue) => {
   return isolatedAdMob;
 };
 
-test('AppVideoManager shows local video after splash and popup delay', async () => {
+test('AppVideoManager shows AdMob after the 10-second launch video', async () => {
+  const { container } = await renderNativeAdMobPhase();
+
+  expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
+  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+  expectLastBannerAdId('ca-app-pub-9859771616835832/2509706314');
+});
+
+test('AppVideoManager shows local popup video after the 50-second AdMob phase', async () => {
   const { container } = await renderNativeLocalVideoPhase();
 
   expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
   expect(screen.queryByLabelText(/close video/i)).not.toBeInTheDocument();
-  expect(AdMob.showBanner).not.toHaveBeenCalled();
 });
 
-test('AppVideoManager shows AdMob after three seconds of local video', async () => {
+test('AppVideoManager returns to AdMob after 10 seconds of local popup video', async () => {
   const { container } = await renderNativeLocalVideoPhase();
 
   expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
@@ -242,6 +250,29 @@ test('AppVideoManager clears timers and removes banner on unmount', async () => 
     await flushPromises();
   });
   expect(AdMob.removeBanner).toHaveBeenCalled();
+});
+
+test('AppVideoManager replays the 10-second splash video when app becomes visible again', async () => {
+  const { container } = await renderNativeAdMobPhase();
+
+  expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
+  expect(AdMob.showBanner).toHaveBeenCalled();
+
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    get: () => 'hidden',
+  });
+  fireEvent(document, new Event('visibilitychange'));
+
+  expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
+
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    get: () => 'visible',
+  });
+  fireEvent(document, new Event('visibilitychange'));
+
+  expect(container.querySelector('.app-video-splash')).toBeInTheDocument();
 });
 
 test('AppVideoManager expands floating video on tap and collapses from backdrop', async () => {

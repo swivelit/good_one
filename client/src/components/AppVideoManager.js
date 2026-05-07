@@ -5,10 +5,9 @@ import {
   showAdMobBanner,
 } from "../services/admob";
 
-const INTRO_TIMEOUT_MS = 4000;
-const POPUP_DELAY_MS = 5000;
 const ONE_MINUTE_AD_LOOP_MS = 60000;
-const LOCAL_VIDEO_DURATION_MS = 3000;
+const LOCAL_VIDEO_DURATION_MS = 10000;
+const INTRO_TIMEOUT_MS = LOCAL_VIDEO_DURATION_MS;
 const GOOGLE_AD_DURATION_MS = ONE_MINUTE_AD_LOOP_MS - LOCAL_VIDEO_DURATION_MS;
 const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
@@ -54,7 +53,6 @@ export default function AppVideoManager() {
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const splashTimerRef = useRef(null);
-  const popupTimerRef = useRef(null);
   const cycleTimerRef = useRef(null);
   const showAdMobPhaseRef = useRef(() => {});
   const showLocalVideoPhaseRef = useRef(() => {});
@@ -127,13 +125,6 @@ export default function AppVideoManager() {
     }
   }, []);
 
-  const clearPopupTimer = useCallback(() => {
-    if (popupTimerRef.current) {
-      clearTimeout(popupTimerRef.current);
-      popupTimerRef.current = null;
-    }
-  }, []);
-
   const clearCycleTimer = useCallback(() => {
     if (cycleTimerRef.current) {
       clearTimeout(cycleTimerRef.current);
@@ -142,9 +133,8 @@ export default function AppVideoManager() {
   }, []);
 
   const clearCycleTimers = useCallback(() => {
-    clearPopupTimer();
     clearCycleTimer();
-  }, [clearCycleTimer, clearPopupTimer]);
+  }, [clearCycleTimer]);
 
   const resetFloatingInteraction = useCallback(() => {
     setIsExpanded(false);
@@ -202,24 +192,14 @@ export default function AppVideoManager() {
     showLocalVideoPhaseRef.current = showLocalVideoPhase;
   }, [showLocalVideoPhase]);
 
-  const scheduleFloatingPopup = useCallback(() => {
-    clearCycleTimers();
-    if (!isNative || showSplash) return;
-    if (document.visibilityState !== "visible") return;
-
-    popupTimerRef.current = setTimeout(() => {
-      popupTimerRef.current = null;
-      if (document.visibilityState === "visible") {
-        showLocalVideoPhaseRef.current();
-      }
-    }, POPUP_DELAY_MS);
-  }, [clearCycleTimers, isNative, showSplash]);
-
-  const stopNativeVideoCycle = useCallback(() => {
+  const stopNativeVideoCycle = useCallback((resetSplash = false) => {
     clearSplashTimer();
     clearCycleTimers();
     resetFloatingInteraction();
     setShowFloating(false);
+    if (resetSplash) {
+      setShowSplash(false);
+    }
     void removeAdMobBanner();
   }, [clearCycleTimers, clearSplashTimer, resetFloatingInteraction]);
 
@@ -286,25 +266,22 @@ export default function AppVideoManager() {
 
   useEffect(() => {
     if (!isNative || showSplash) return undefined;
+    if (document.visibilityState !== "visible") return undefined;
 
-    scheduleFloatingPopup();
+    showAdMobPhaseRef.current();
     return clearCycleTimers;
-  }, [clearCycleTimers, isNative, scheduleFloatingPopup, showSplash]);
+  }, [clearCycleTimers, isNative, showSplash]);
 
   useEffect(() => {
     if (!isNative) return undefined;
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        stopNativeVideoCycle();
+        stopNativeVideoCycle(true);
         return;
       }
 
-      if (showSplash) {
-        scheduleSplashTimeout();
-      } else {
-        scheduleFloatingPopup();
-      }
+      setShowSplash(true);
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -313,9 +290,6 @@ export default function AppVideoManager() {
     };
   }, [
     isNative,
-    scheduleFloatingPopup,
-    scheduleSplashTimeout,
-    showSplash,
     stopNativeVideoCycle,
   ]);
 
@@ -361,8 +335,8 @@ export default function AppVideoManager() {
           <video
             src={VIDEO_SRC}
             autoPlay
-            muted
             playsInline
+            preload="auto"
             onEnded={hideSplash}
             onError={hideSplash}
           />
@@ -391,7 +365,7 @@ export default function AppVideoManager() {
             onPointerUp={finishDrag}
             onPointerCancel={finishDrag}
           >
-            <video src={VIDEO_SRC} autoPlay muted playsInline loop />
+            <video src={VIDEO_SRC} autoPlay playsInline preload="auto" />
           </div>
         </>
       )}
