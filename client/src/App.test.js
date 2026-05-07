@@ -50,6 +50,7 @@ jest.mock('react-router-dom', () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve());
   Capacitor.isNativePlatform.mockReturnValue(false);
   Capacitor.getPlatform.mockReturnValue('android');
   Object.defineProperty(document, 'visibilityState', {
@@ -147,7 +148,7 @@ const expectLastBannerAdId = (adId) => {
       adId,
       adSize: 'ADAPTIVE_BANNER',
       position: 'BOTTOM_CENTER',
-      margin: 72,
+      margin: 0,
       isTesting: true,
     })
   );
@@ -190,11 +191,13 @@ test('AppVideoManager shows AdMob after the 10-second launch video', async () =>
   expectLastBannerAdId('ca-app-pub-9859771616835832/2509706314');
 });
 
-test('AppVideoManager shows local popup video after the 50-second AdMob phase', async () => {
+test('AppVideoManager shows local popup video after the 50-second AdMob phase while keeping the bottom banner', async () => {
   const { container } = await renderNativeLocalVideoPhase();
 
   expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
   expect(screen.queryByLabelText(/close video/i)).not.toBeInTheDocument();
+  expect(AdMob.removeBanner).not.toHaveBeenCalled();
+  expectLastBannerAdId('ca-app-pub-9859771616835832/2509706314');
 });
 
 test('AppVideoManager returns to AdMob after 10 seconds of local popup video', async () => {
@@ -222,7 +225,7 @@ test('AppVideoManager uses the iOS banner ad unit on iOS', async () => {
   expectLastBannerAdId('ca-app-pub-9859771616835832/9324413170');
 });
 
-test('AppVideoManager returns to local video after the AdMob phase', async () => {
+test('AppVideoManager returns to local video after the AdMob phase without removing the bottom banner', async () => {
   const { container } = await renderNativeAdMobPhase();
   const removeBannerCount = AdMob.removeBanner.mock.calls.length;
 
@@ -234,8 +237,9 @@ test('AppVideoManager returns to local video after the AdMob phase', async () =>
 
   await advanceTimers(1);
 
-  expect(AdMob.removeBanner).toHaveBeenCalledTimes(removeBannerCount + 1);
+  expect(AdMob.removeBanner).toHaveBeenCalledTimes(removeBannerCount);
   expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
+  expectLastBannerAdId('ca-app-pub-9859771616835832/2509706314');
 });
 
 test('AppVideoManager clears timers and removes banner on unmount', async () => {
@@ -289,6 +293,25 @@ test('AppVideoManager expands floating video on tap and collapses from backdrop'
 
   expect(widget).not.toHaveClass('expanded');
   expect(container.querySelector('.floating-video-backdrop')).not.toBeInTheDocument();
+});
+
+test('AppVideoManager keeps floating popup muted until the user taps to expand it', async () => {
+  const { container } = await renderNativeLocalVideoPhase();
+  const widget = container.querySelector('.floating-video-widget');
+  const video = widget.querySelector('video');
+
+  expect(video.muted).toBe(true);
+
+  fireEvent.pointerDown(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
+  fireEvent.pointerUp(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
+
+  expect(widget).toHaveClass('expanded');
+  expect(video.muted).toBe(false);
+
+  fireEvent.pointerDown(container.querySelector('.floating-video-backdrop'));
+
+  expect(widget).not.toHaveClass('expanded');
+  expect(video.muted).toBe(true);
 });
 
 test('AppVideoManager has no close button after expanding floating video', async () => {

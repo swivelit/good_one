@@ -11,7 +11,8 @@ const INTRO_TIMEOUT_MS = LOCAL_VIDEO_DURATION_MS;
 const GOOGLE_AD_DURATION_MS = ONE_MINUTE_AD_LOOP_MS - LOCAL_VIDEO_DURATION_MS;
 const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
-const DEFAULT_BOTTOM_OFFSET = 90;
+const BOTTOM_AD_RESERVED_PX = 96;
+const DEFAULT_BOTTOM_OFFSET = BOTTOM_AD_RESERVED_PX + EDGE_GAP;
 const DRAG_THRESHOLD_PX = 7;
 const VIDEO_SRC = "/media/goodone-intro.mp4";
 
@@ -56,7 +57,10 @@ export default function AppVideoManager() {
   const cycleTimerRef = useRef(null);
   const showAdMobPhaseRef = useRef(() => {});
   const showLocalVideoPhaseRef = useRef(() => {});
+  const isAdMobBannerVisibleRef = useRef(false);
+  const adMobBannerRequestIdRef = useRef(0);
   const widgetRef = useRef(null);
+  const floatingVideoRef = useRef(null);
   const dragRef = useRef(null);
 
   const getWidgetSize = useCallback(() => {
@@ -78,7 +82,7 @@ export default function AppVideoManager() {
     const minLeft = EDGE_GAP + safe.left;
     const minTop = EDGE_GAP + safe.top;
     const maxLeft = Math.max(minLeft, viewportWidth - width - EDGE_GAP - safe.right);
-    const maxTop = Math.max(minTop, viewportHeight - height - EDGE_GAP - safe.bottom);
+    const maxTop = Math.max(minTop, viewportHeight - height - EDGE_GAP - safe.bottom - BOTTOM_AD_RESERVED_PX);
 
     return {
       left: Math.min(Math.max(position.left, minLeft), maxLeft),
@@ -136,11 +140,41 @@ export default function AppVideoManager() {
     clearCycleTimer();
   }, [clearCycleTimer]);
 
+  const muteFloatingAudio = useCallback(() => {
+    const video = floatingVideoRef.current;
+    if (!video) return;
+
+    video.muted = true;
+    video.defaultMuted = true;
+  }, []);
+
+  const enableExpandedAudio = useCallback(() => {
+    const video = floatingVideoRef.current;
+    if (!video) return;
+
+    video.muted = false;
+    video.defaultMuted = false;
+    try {
+      const playPromise = video.play?.();
+      if (playPromise?.catch) {
+        playPromise.catch(() => {});
+      }
+    } catch {
+      // Some test/browser environments reject unmuted playback even after a tap.
+    }
+  }, []);
+
+  const collapseFloatingVideo = useCallback(() => {
+    muteFloatingAudio();
+    setIsExpanded(false);
+  }, [muteFloatingAudio]);
+
   const resetFloatingInteraction = useCallback(() => {
+    muteFloatingAudio();
     setIsExpanded(false);
     setIsDragging(false);
     dragRef.current = null;
-  }, []);
+  }, [muteFloatingAudio]);
 
   const hideSplash = useCallback(() => {
     clearSplashTimer();
@@ -154,25 +188,43 @@ export default function AppVideoManager() {
     splashTimerRef.current = setTimeout(hideSplash, INTRO_TIMEOUT_MS);
   }, [clearSplashTimer, hideSplash, isNative, showSplash]);
 
+  const ensureBottomAdMobBanner = useCallback(() => {
+    if (isAdMobBannerVisibleRef.current) return;
+
+    const requestId = adMobBannerRequestIdRef.current + 1;
+    adMobBannerRequestIdRef.current = requestId;
+
+    void showAdMobBanner().then((isVisible) => {
+      if (adMobBannerRequestIdRef.current === requestId) {
+        isAdMobBannerVisibleRef.current = Boolean(isVisible);
+      }
+    });
+  }, []);
+
+  const removeBottomAdMobBanner = useCallback(() => {
+    adMobBannerRequestIdRef.current += 1;
+    isAdMobBannerVisibleRef.current = false;
+    void removeAdMobBanner();
+  }, []);
+
   const showAdMobPhase = useCallback(() => {
     clearCycleTimer();
     if (!isNative || document.visibilityState !== "visible") return;
 
     resetFloatingInteraction();
     setShowFloating(false);
-    void showAdMobBanner();
+    ensureBottomAdMobBanner();
 
     cycleTimerRef.current = setTimeout(() => {
       cycleTimerRef.current = null;
       showLocalVideoPhaseRef.current();
     }, GOOGLE_AD_DURATION_MS);
-  }, [clearCycleTimer, isNative, resetFloatingInteraction]);
+  }, [clearCycleTimer, ensureBottomAdMobBanner, isNative, resetFloatingInteraction]);
 
   const showLocalVideoPhase = useCallback(() => {
     clearCycleTimer();
     if (!isNative || document.visibilityState !== "visible") return;
 
-    void removeAdMobBanner();
     resetFloatingInteraction();
     setFloatingPosition(loadPosition());
     setShowFloating(true);
@@ -200,8 +252,8 @@ export default function AppVideoManager() {
     if (resetSplash) {
       setShowSplash(false);
     }
-    void removeAdMobBanner();
-  }, [clearCycleTimers, clearSplashTimer, resetFloatingInteraction]);
+    removeBottomAdMobBanner();
+  }, [clearCycleTimers, clearSplashTimer, removeBottomAdMobBanner, resetFloatingInteraction]);
 
   const handlePointerDown = useCallback((event) => {
     if (isExpanded || !floatingPosition || event.button > 0) return;
@@ -247,6 +299,7 @@ export default function AppVideoManager() {
 
     if (!drag.hasMoved) {
       setIsExpanded(true);
+      enableExpandedAudio();
       return;
     }
 
@@ -255,7 +308,7 @@ export default function AppVideoManager() {
       savePosition(clamped);
       return clamped;
     });
-  }, [clampPosition, getDefaultPosition, savePosition]);
+  }, [clampPosition, enableExpandedAudio, getDefaultPosition, savePosition]);
 
   useEffect(() => {
     if (!isNative) return undefined;
@@ -300,9 +353,9 @@ export default function AppVideoManager() {
       clearSplashTimer();
       clearCycleTimers();
       setShowFloating(false);
-      void removeAdMobBanner();
+      removeBottomAdMobBanner();
     };
-  }, [clearCycleTimers, clearSplashTimer, isNative]);
+  }, [clearCycleTimers, clearSplashTimer, isNative, removeBottomAdMobBanner]);
 
   useEffect(() => {
     if (!isNative) return undefined;
@@ -349,7 +402,7 @@ export default function AppVideoManager() {
             <div
               className="floating-video-backdrop"
               role="presentation"
-              onPointerDown={() => setIsExpanded(false)}
+              onPointerDown={collapseFloatingVideo}
             />
           )}
           <div
@@ -365,7 +418,14 @@ export default function AppVideoManager() {
             onPointerUp={finishDrag}
             onPointerCancel={finishDrag}
           >
-            <video src={VIDEO_SRC} autoPlay playsInline preload="auto" />
+            <video
+              ref={floatingVideoRef}
+              src={VIDEO_SRC}
+              autoPlay
+              playsInline
+              preload="auto"
+              muted={!isExpanded}
+            />
           </div>
         </>
       )}

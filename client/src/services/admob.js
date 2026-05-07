@@ -4,7 +4,7 @@ const ADMOB_BANNER_AD_UNIT_IDS = {
   android: "ca-app-pub-9859771616835832/2509706314",
   ios: "ca-app-pub-9859771616835832/9324413170",
 };
-const BANNER_BOTTOM_MARGIN_PX = 72;
+const BANNER_BOTTOM_MARGIN_PX = 0;
 const USE_TEST_ADS =
   String(process.env.REACT_APP_USE_ADMOB_TEST_ADS || "true").toLowerCase() !== "false";
 
