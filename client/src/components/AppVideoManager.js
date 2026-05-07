@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
+  getAdMobBannerStatus,
   removeAdMobBanner,
   showAdMobBanner,
 } from "../services/admob";
@@ -189,14 +190,15 @@ export default function AppVideoManager() {
   }, [clearSplashTimer, hideSplash, isNative, showSplash]);
 
   const ensureBottomAdMobBanner = useCallback(() => {
-    if (isAdMobBannerVisibleRef.current) return;
+    const status = getAdMobBannerStatus();
+    if (status === "loading" || status === "loaded") return;
 
     const requestId = adMobBannerRequestIdRef.current + 1;
     adMobBannerRequestIdRef.current = requestId;
 
-    void showAdMobBanner().then((isVisible) => {
+    void showAdMobBanner().then((requestStarted) => {
       if (adMobBannerRequestIdRef.current === requestId) {
-        isAdMobBannerVisibleRef.current = Boolean(isVisible);
+        isAdMobBannerVisibleRef.current = Boolean(requestStarted);
       }
     });
   }, []);
@@ -226,6 +228,7 @@ export default function AppVideoManager() {
     if (!isNative || document.visibilityState !== "visible") return;
 
     resetFloatingInteraction();
+    ensureBottomAdMobBanner();
     setFloatingPosition(loadPosition());
     setShowFloating(true);
 
@@ -234,7 +237,7 @@ export default function AppVideoManager() {
       setShowFloating(false);
       showAdMobPhaseRef.current();
     }, LOCAL_VIDEO_DURATION_MS);
-  }, [clearCycleTimer, isNative, loadPosition, resetFloatingInteraction]);
+  }, [clearCycleTimer, ensureBottomAdMobBanner, isNative, loadPosition, resetFloatingInteraction]);
 
   useEffect(() => {
     showAdMobPhaseRef.current = showAdMobPhase;

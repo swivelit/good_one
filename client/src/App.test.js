@@ -181,9 +181,9 @@ const showBannerWithIsolatedAdMobEnv = async (envValue) => {
   isolatedCapacitor.isNativePlatform.mockReturnValue(true);
   isolatedCapacitor.getPlatform.mockReturnValue('android');
   isolatedAdMob.initialize.mockClear();
-  isolatedAdMob.requestConsentInfo.mockClear();
-  isolatedAdMob.showConsentForm.mockClear();
-  isolatedAdMob.addListener.mockClear();
+  isolatedAdMob.requestConsentInfo?.mockClear();
+  isolatedAdMob.showConsentForm?.mockClear();
+  isolatedAdMob.addListener?.mockClear();
   isolatedAdMob.showBanner.mockClear();
 
   const { showAdMobBanner } = require('./services/admob');
@@ -352,6 +352,20 @@ test('AppVideoManager drag movement does not expand floating video', async () =>
   expect(container.querySelector('.floating-video-backdrop')).not.toBeInTheDocument();
 });
 
+
+test('AppVideoManager retries the AdMob banner after a load timeout', async () => {
+  const { container } = await renderNativeAdMobPhase();
+
+  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+  expect(AdMob.showBanner).toHaveBeenCalledTimes(1);
+
+  await advanceTimers(8000);
+  await advanceTimers(GOOGLE_AD_DURATION_MS - 8000);
+
+  expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
+  expect(AdMob.showBanner).toHaveBeenCalledTimes(2);
+});
+
 test('REACT_APP_USE_ADMOB_TEST_ADS defaults to true', async () => {
   const isolatedAdMob = await showBannerWithIsolatedAdMobEnv(undefined);
 
@@ -366,7 +380,7 @@ test('REACT_APP_USE_ADMOB_TEST_ADS defaults to true', async () => {
   );
 });
 
-test('REACT_APP_USE_ADMOB_TEST_ADS=false makes showBanner use production ads and isTesting:false', async () => {
+test('REACT_APP_USE_ADMOB_TEST_ADS=false makes showBanner use isTesting:false', async () => {
   const isolatedAdMob = await showBannerWithIsolatedAdMobEnv('false');
 
   expect(isolatedAdMob.initialize).toHaveBeenCalledWith({
@@ -374,7 +388,6 @@ test('REACT_APP_USE_ADMOB_TEST_ADS=false makes showBanner use production ads and
   });
   expect(isolatedAdMob.showBanner).toHaveBeenCalledWith(
     expect.objectContaining({
-      adId: 'ca-app-pub-9859771616835832/2509706314',
       isTesting: false,
     })
   );

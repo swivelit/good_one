@@ -1,6 +1,5 @@
-# Copy this file to client/android/key.properties and fill real values.
-# Never commit key.properties or *.jks files. They are already ignored by .gitignore.
-# The storeFile path is relative to client/android/app.
+# Copy this file to android/key.properties and fill real production values.
+# Never commit android/key.properties or your .jks keystore.
 storeFile=../keystores/goodone-upload-key.jks
 storePassword=CHANGE_ME
 keyAlias=goodone-upload
