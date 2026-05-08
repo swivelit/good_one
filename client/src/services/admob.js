@@ -11,9 +11,13 @@ const GOOGLE_DEMO_BANNER_AD_UNIT_IDS = {
 };
 
 const BANNER_BOTTOM_MARGIN_PX = 0;
-export const DEFAULT_ADMOB_BANNER_HEIGHT_PX = 50;
+const BANNER_LAYOUT_GUARD_PX = 8;
+const PHONE_BANNER_HEIGHT_PX = 60;
+const TABLET_BANNER_HEIGHT_PX = 90;
+export const DEFAULT_ADMOB_BANNER_HEIGHT_PX = PHONE_BANNER_HEIGHT_PX + BANNER_LAYOUT_GUARD_PX;
 const BANNER_LOAD_TIMEOUT_MS = 8000;
 const BANNER_HEIGHT_CSS_VARIABLE = "--goodone-admob-banner-height";
+const BANNER_LAYOUT_EVENT = "goodone:admob-banner-layout-change";
 const USE_TEST_ADS =
   String(process.env.REACT_APP_USE_ADMOB_TEST_ADS || "true").toLowerCase() !== "false";
 
@@ -51,13 +55,40 @@ export const isAdMobBannerRequestActive = () => (
   bannerStatus === "loading" || bannerStatus === "loaded"
 );
 
+const getEstimatedBannerLayoutHeight = () => {
+  if (typeof window === "undefined") return DEFAULT_ADMOB_BANNER_HEIGHT_PX;
+
+  const viewportWidth = Math.max(
+    Number(window.visualViewport?.width) || 0,
+    Number(window.innerWidth) || 0,
+    Number(window.screen?.width) || 0
+  );
+  const expectedBannerHeight = viewportWidth >= 720
+    ? TABLET_BANNER_HEIGHT_PX
+    : PHONE_BANNER_HEIGHT_PX;
+
+  return expectedBannerHeight + BANNER_LAYOUT_GUARD_PX;
+};
+
 const normalizeBannerHeight = (height) => {
+  const fallbackHeight = getEstimatedBannerLayoutHeight();
   const numericHeight = Number(height);
   if (!Number.isFinite(numericHeight) || numericHeight <= 0) {
-    return DEFAULT_ADMOB_BANNER_HEIGHT_PX;
+    return fallbackHeight;
   }
 
-  return Math.max(DEFAULT_ADMOB_BANNER_HEIGHT_PX, Math.ceil(numericHeight));
+  return Math.max(
+    DEFAULT_ADMOB_BANNER_HEIGHT_PX,
+    Math.ceil(numericHeight) + BANNER_LAYOUT_GUARD_PX
+  );
+};
+
+const emitAdMobBannerLayoutChange = (height) => {
+  if (typeof window === "undefined") return;
+
+  window.dispatchEvent(new CustomEvent(BANNER_LAYOUT_EVENT, {
+    detail: { height },
+  }));
 };
 
 const setAdMobBannerLayoutHeight = (height) => {
@@ -74,6 +105,8 @@ const setAdMobBannerLayoutHeight = (height) => {
   } else {
     document.body?.classList?.remove("goodone-admob-banner-active");
   }
+
+  emitAdMobBannerLayoutChange(normalizedHeight);
 };
 
 const reserveAdMobBannerLayoutSpace = (height = lastKnownBannerHeightPx) => {
@@ -254,7 +287,7 @@ export const showAdMobBanner = async ({ force = false } = {}) => {
 
     await admobModule.AdMob.showBanner({
       adId,
-      adSize: admobModule.BannerAdSize.BANNER,
+      adSize: admobModule.BannerAdSize.ADAPTIVE_BANNER || admobModule.BannerAdSize.BANNER,
       position: admobModule.BannerAdPosition.BOTTOM_CENTER,
       margin: BANNER_BOTTOM_MARGIN_PX,
       isTesting: USE_TEST_ADS,

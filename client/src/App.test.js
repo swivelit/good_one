@@ -158,7 +158,7 @@ const expectLastBannerAdId = (adId) => {
   expect(AdMob.showBanner).toHaveBeenLastCalledWith(
     expect.objectContaining({
       adId,
-      adSize: 'BANNER',
+      adSize: 'ADAPTIVE_BANNER',
       position: 'BOTTOM_CENTER',
       margin: 0,
       isTesting: true,

@@ -8,8 +8,11 @@
   --radius: 14px;
   --goodone-admob-banner-height: 0px;
   --goodone-native-bottom-nav-height: 72px;
+  --goodone-native-bottom-nav-gap: 6px;
   --goodone-native-bottom-chrome-height: calc(
-    var(--goodone-admob-banner-height) + var(--goodone-native-bottom-nav-height)
+    var(--goodone-admob-banner-height) +
+    var(--goodone-native-bottom-nav-height) +
+    var(--goodone-native-bottom-nav-gap)
   );
 }
 
@@ -380,14 +383,18 @@ body.goodone-native-shell-active {
 }
 
 body.goodone-native-shell-active #root {
-  height: 100dvh;
+  position: fixed;
+  inset: 0;
+  height: auto;
   overflow: hidden;
 }
 
 .native-app-shell {
-  height: calc(100dvh - var(--goodone-admob-banner-height));
+  position: fixed;
+  inset: 0 0 var(--goodone-admob-banner-height) 0;
+  height: auto;
   min-height: 0;
-  max-height: calc(100dvh - var(--goodone-admob-banner-height));
+  max-height: none;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -397,8 +404,9 @@ body.goodone-native-shell-active #root {
 }
 
 .native-app-shell.native-with-bottom-nav {
-  height: calc(100dvh - var(--goodone-native-bottom-chrome-height));
-  max-height: calc(100dvh - var(--goodone-native-bottom-chrome-height));
+  bottom: var(--goodone-native-bottom-chrome-height);
+  height: auto;
+  max-height: none;
   padding-bottom: 0;
 }
 
@@ -489,14 +497,15 @@ body.goodone-native-shell-active #root {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: var(--goodone-admob-banner-height);
+  bottom: calc(var(--goodone-admob-banner-height) + var(--goodone-native-bottom-nav-gap));
   z-index: 1040;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   gap: 0.25rem;
+  min-height: var(--goodone-native-bottom-nav-height);
   padding: 0.45rem 0.75rem calc(0.45rem + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.97);
+  background: rgba(255, 255, 255, 0.98);
   border-top: 1px solid rgba(44, 62, 80, 0.1);
   box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(14px);

@@ -12,10 +12,11 @@ const INTRO_TIMEOUT_MS = LOCAL_VIDEO_DURATION_MS;
 const GOOGLE_AD_DURATION_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
 const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
-const DEFAULT_BOTTOM_AD_RESERVED_PX = 50;
+const DEFAULT_BOTTOM_AD_RESERVED_PX = 68;
 const DRAG_THRESHOLD_PX = 7;
 const ADMOB_BANNER_HEIGHT_CSS_VARIABLE = "--goodone-admob-banner-height";
 const NATIVE_BOTTOM_NAV_HEIGHT_CSS_VARIABLE = "--goodone-native-bottom-nav-height";
+const ADMOB_LAYOUT_EVENT = "goodone:admob-banner-layout-change";
 const VIDEO_SRC = "/media/goodone-intro.mp4";
 
 const getWindowSize = () => ({
@@ -393,6 +394,7 @@ export default function AppVideoManager() {
     mutationObserver?.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("resize", syncNativeChromeLayout);
     window.addEventListener("orientationchange", syncNativeChromeLayout);
+    window.addEventListener(ADMOB_LAYOUT_EVENT, syncNativeChromeLayout);
     window.visualViewport?.addEventListener("resize", syncNativeChromeLayout);
 
     return () => {
@@ -401,6 +403,7 @@ export default function AppVideoManager() {
       resizeObserver?.disconnect();
       window.removeEventListener("resize", syncNativeChromeLayout);
       window.removeEventListener("orientationchange", syncNativeChromeLayout);
+      window.removeEventListener(ADMOB_LAYOUT_EVENT, syncNativeChromeLayout);
       window.visualViewport?.removeEventListener("resize", syncNativeChromeLayout);
       setRootCssPixelValue(NATIVE_BOTTOM_NAV_HEIGHT_CSS_VARIABLE, 0);
       setRootCssPixelValue(ADMOB_BANNER_HEIGHT_CSS_VARIABLE, 0);
