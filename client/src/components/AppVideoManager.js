@@ -12,9 +12,10 @@ const INTRO_TIMEOUT_MS = LOCAL_VIDEO_DURATION_MS;
 const GOOGLE_AD_DURATION_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
 const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
-const BOTTOM_AD_RESERVED_PX = 50;
-const DEFAULT_BOTTOM_NAV_RESERVED_PX = 76;
+const DEFAULT_BOTTOM_AD_RESERVED_PX = 50;
 const DRAG_THRESHOLD_PX = 7;
+const ADMOB_BANNER_HEIGHT_CSS_VARIABLE = "--goodone-admob-banner-height";
+const NATIVE_BOTTOM_NAV_HEIGHT_CSS_VARIABLE = "--goodone-native-bottom-nav-height";
 const VIDEO_SRC = "/media/goodone-intro.mp4";
 
 const getWindowSize = () => ({
@@ -47,18 +48,41 @@ const getSafeAreaInsets = () => {
   return insets;
 };
 
+const getCssPixelValue = (name, fallback = 0) => {
+  if (typeof document === "undefined") return fallback;
+
+  const value = window.getComputedStyle(document.documentElement).getPropertyValue(name);
+  const numericValue = parseFloat(value);
+  return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : fallback;
+};
+
+const setRootCssPixelValue = (name, value) => {
+  if (typeof document === "undefined") return;
+
+  const numericValue = Math.max(0, Math.ceil(Number(value) || 0));
+  document.documentElement.style.setProperty(name, `${numericValue}px`);
+};
+
+const getAdMobBannerReservedHeight = () => (
+  getCssPixelValue(ADMOB_BANNER_HEIGHT_CSS_VARIABLE, DEFAULT_BOTTOM_AD_RESERVED_PX)
+);
+
 const getNativeBottomNavHeight = () => {
-  if (typeof document === "undefined") return DEFAULT_BOTTOM_NAV_RESERVED_PX;
+  if (typeof document === "undefined") return 0;
 
   const bottomNav = document.querySelector(".native-bottom-nav");
   const bottomNavHeight = bottomNav?.getBoundingClientRect?.().height;
-  return Number.isFinite(bottomNavHeight) && bottomNavHeight > 0
-    ? bottomNavHeight
-    : DEFAULT_BOTTOM_NAV_RESERVED_PX;
+  return Number.isFinite(bottomNavHeight) && bottomNavHeight > 0 ? bottomNavHeight : 0;
+};
+
+const syncNativeBottomNavHeightCssVariable = () => {
+  const bottomNavHeight = getNativeBottomNavHeight();
+  setRootCssPixelValue(NATIVE_BOTTOM_NAV_HEIGHT_CSS_VARIABLE, bottomNavHeight);
+  return bottomNavHeight;
 };
 
 const getNativeBottomChromeReservedHeight = () => (
-  BOTTOM_AD_RESERVED_PX + getNativeBottomNavHeight()
+  getAdMobBannerReservedHeight() + getNativeBottomNavHeight()
 );
 
 export default function AppVideoManager() {
@@ -328,6 +352,60 @@ export default function AppVideoManager() {
       return clamped;
     });
   }, [clampPosition, enableExpandedAudio, getDefaultPosition, savePosition]);
+
+  useEffect(() => {
+    if (!isNative) return undefined;
+
+    document.body.classList.add("goodone-native-shell-active");
+
+    let observedBottomNav = null;
+    let resizeObserver = null;
+
+    const syncNativeChromeLayout = () => {
+      const bottomNav = document.querySelector(".native-bottom-nav");
+      syncNativeBottomNavHeightCssVariable();
+
+      if (window.ResizeObserver && bottomNav && bottomNav !== observedBottomNav) {
+        resizeObserver?.disconnect();
+        resizeObserver = new ResizeObserver(() => {
+          syncNativeBottomNavHeightCssVariable();
+          setFloatingPosition((current) => (current ? clampPosition(current) : current));
+        });
+        resizeObserver.observe(bottomNav);
+        observedBottomNav = bottomNav;
+      }
+
+      if (!bottomNav && observedBottomNav) {
+        resizeObserver?.disconnect();
+        resizeObserver = null;
+        observedBottomNav = null;
+      }
+
+      setFloatingPosition((current) => (current ? clampPosition(current) : current));
+    };
+
+    syncNativeChromeLayout();
+
+    const mutationObserver = window.MutationObserver
+      ? new MutationObserver(syncNativeChromeLayout)
+      : null;
+
+    mutationObserver?.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", syncNativeChromeLayout);
+    window.addEventListener("orientationchange", syncNativeChromeLayout);
+    window.visualViewport?.addEventListener("resize", syncNativeChromeLayout);
+
+    return () => {
+      document.body.classList.remove("goodone-native-shell-active", "goodone-admob-banner-active");
+      mutationObserver?.disconnect();
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", syncNativeChromeLayout);
+      window.removeEventListener("orientationchange", syncNativeChromeLayout);
+      window.visualViewport?.removeEventListener("resize", syncNativeChromeLayout);
+      setRootCssPixelValue(NATIVE_BOTTOM_NAV_HEIGHT_CSS_VARIABLE, 0);
+      setRootCssPixelValue(ADMOB_BANNER_HEIGHT_CSS_VARIABLE, 0);
+    };
+  }, [clampPosition, isNative]);
 
   useEffect(() => {
     if (!isNative) return undefined;

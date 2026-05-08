@@ -1,6 +1,6 @@
 # Android AdMob QA
 
-Use this flow when the banner is not visible on a real phone.
+Use this flow when the banner is not visible or when it overlaps the app UI on a real phone.
 
 ## Build and install the debug APK with Google demo ads
 
@@ -17,12 +17,18 @@ The debug APK uses:
 
 Wait until the 10-second full-screen video finishes. The banner request starts after that.
 
-Expected layout on the phone:
+## Expected layout
 
-- the Google test banner sits at the physical bottom of the app WebView
-- the GoodOne bottom tab bar sits directly above the banner
-- the banner must not cover the Browse / Chat / Profile tabs
-- the floating video popup must stay above both the bottom tab bar and the banner
+The native AdMob banner is an Android overlay, not a React element. The app now reserves space for the actual banner height and resizes the React WebView content area around it.
+
+Expected order from top to bottom:
+
+1. GoodOne app content inside a scrollable native app shell
+2. GoodOne bottom tabs: Browse / Chat / Profile
+3. Google test ad banner
+4. Android gesture/navigation area
+
+The page content should not scroll behind the GoodOne bottom tabs or the Google banner. If the banner height changes, the app updates the CSS variable `--goodone-admob-banner-height` from the AdMob `SizeChanged` event.
 
 ## Watch AdMob logs
 
@@ -38,6 +44,7 @@ Look for:
 - `[AdMob] test banner request`
 - `[AdMob] banner loaded`
 - `[AdMob] banner load failed`
+- `[AdMob] banner size changed`
 - `Ad ID:`
 - `LoadAdError`
 
@@ -50,4 +57,4 @@ Only release builds should use:
 - GoodOne Android AdMob app ID: `ca-app-pub-9859771616835832~9892448873`
 - GoodOne Android banner ad unit: `ca-app-pub-9859771616835832/2509706314`
 
-Build release only after the debug demo banner is visible on a phone.
+Build release only after the debug demo banner is visible on a phone and the tabs/content no longer overlap it.

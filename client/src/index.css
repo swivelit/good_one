@@ -6,7 +6,7 @@
   --light-bg: #FFF8F4;
   --card-shadow: 0 4px 24px rgba(255, 107, 53, 0.10);
   --radius: 14px;
-  --goodone-admob-banner-height: 50px;
+  --goodone-admob-banner-height: 0px;
   --goodone-native-bottom-nav-height: 72px;
   --goodone-native-bottom-chrome-height: calc(
     var(--goodone-admob-banner-height) + var(--goodone-native-bottom-nav-height)
@@ -372,14 +372,34 @@ body {
 }
 
 /* Capacitor native shell */
-.native-app-shell {
-  min-height: 100dvh;
+body.goodone-native-shell-active {
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
   background: #f8f9fa;
-  padding-bottom: calc(var(--goodone-admob-banner-height) + env(safe-area-inset-bottom));
+}
+
+body.goodone-native-shell-active #root {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.native-app-shell {
+  height: calc(100dvh - var(--goodone-admob-banner-height));
+  min-height: 0;
+  max-height: calc(100dvh - var(--goodone-admob-banner-height));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  background: #f8f9fa;
+  padding-bottom: 0;
 }
 
 .native-app-shell.native-with-bottom-nav {
-  padding-bottom: calc(var(--goodone-native-bottom-chrome-height) + env(safe-area-inset-bottom));
+  height: calc(100dvh - var(--goodone-native-bottom-chrome-height));
+  max-height: calc(100dvh - var(--goodone-native-bottom-chrome-height));
+  padding-bottom: 0;
 }
 
 .native-app-shell footer {
@@ -514,7 +534,7 @@ body {
 }
 
 .native-app-shell .auth-wrapper {
-  min-height: 100dvh;
+  min-height: 100%;
   padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));
 }
 
@@ -754,7 +774,7 @@ body {
 
 .native-app-shell .add-product-submit {
   position: sticky;
-  bottom: calc(var(--goodone-native-bottom-chrome-height) + env(safe-area-inset-bottom) + 4px);
+  bottom: 4px;
   z-index: 5;
   box-shadow: 0 10px 28px rgba(255, 107, 53, 0.28);
 }

@@ -11,7 +11,9 @@ const GOOGLE_DEMO_BANNER_AD_UNIT_IDS = {
 };
 
 const BANNER_BOTTOM_MARGIN_PX = 0;
+export const DEFAULT_ADMOB_BANNER_HEIGHT_PX = 50;
 const BANNER_LOAD_TIMEOUT_MS = 8000;
+const BANNER_HEIGHT_CSS_VARIABLE = "--goodone-admob-banner-height";
 const USE_TEST_ADS =
   String(process.env.REACT_APP_USE_ADMOB_TEST_ADS || "true").toLowerCase() !== "false";
 
@@ -21,6 +23,7 @@ let isInitialized = false;
 let areBannerListenersRegistered = false;
 let bannerStatus = "idle";
 let bannerLoadTimeout = null;
+let lastKnownBannerHeightPx = DEFAULT_ADMOB_BANNER_HEIGHT_PX;
 
 const isNativePlatform = () => Capacitor.isNativePlatform();
 
@@ -42,9 +45,46 @@ export const getAdMobBannerAdUnitId = () => (
 
 export const getAdMobBannerStatus = () => bannerStatus;
 
+export const getAdMobBannerHeight = () => lastKnownBannerHeightPx;
+
 export const isAdMobBannerRequestActive = () => (
   bannerStatus === "loading" || bannerStatus === "loaded"
 );
+
+const normalizeBannerHeight = (height) => {
+  const numericHeight = Number(height);
+  if (!Number.isFinite(numericHeight) || numericHeight <= 0) {
+    return DEFAULT_ADMOB_BANNER_HEIGHT_PX;
+  }
+
+  return Math.max(DEFAULT_ADMOB_BANNER_HEIGHT_PX, Math.ceil(numericHeight));
+};
+
+const setAdMobBannerLayoutHeight = (height) => {
+  if (typeof document === "undefined") return;
+
+  const normalizedHeight = Math.max(0, Math.ceil(Number(height) || 0));
+  document.documentElement.style.setProperty(
+    BANNER_HEIGHT_CSS_VARIABLE,
+    `${normalizedHeight}px`
+  );
+
+  if (normalizedHeight > 0) {
+    document.body?.classList?.add("goodone-admob-banner-active");
+  } else {
+    document.body?.classList?.remove("goodone-admob-banner-active");
+  }
+};
+
+const reserveAdMobBannerLayoutSpace = (height = lastKnownBannerHeightPx) => {
+  const normalizedHeight = normalizeBannerHeight(height);
+  lastKnownBannerHeightPx = normalizedHeight;
+  setAdMobBannerLayoutHeight(normalizedHeight);
+};
+
+const releaseAdMobBannerLayoutSpace = () => {
+  setAdMobBannerLayoutHeight(0);
+};
 
 const logAdMobError = (action, error) => {
   console.warn(`[AdMob] ${action} failed`, error);
@@ -67,8 +107,9 @@ const setBannerStatus = (nextStatus) => {
   bannerStatus = nextStatus;
 };
 
-const markBannerLoaded = (source, data) => {
+const markBannerLoaded = (source, data = {}) => {
   clearBannerLoadTimeout();
+  reserveAdMobBannerLayoutSpace(data?.height || lastKnownBannerHeightPx);
   setBannerStatus("loaded");
   logAdMobInfo(`banner loaded via ${source}`, data);
 };
@@ -76,6 +117,7 @@ const markBannerLoaded = (source, data) => {
 const markBannerFailed = (source, error) => {
   clearBannerLoadTimeout();
   setBannerStatus("failed");
+  releaseAdMobBannerLayoutSpace();
   logAdMobError(source, error);
 };
 
@@ -84,6 +126,7 @@ const startBannerLoadTimeout = () => {
   bannerLoadTimeout = setTimeout(() => {
     if (bannerStatus === "loading") {
       setBannerStatus("failed");
+      releaseAdMobBannerLayoutSpace();
       logAdMobError("banner load timeout", {
         timeoutMs: BANNER_LOAD_TIMEOUT_MS,
         message: "No AdMob Loaded/FailedToLoad event was received. The app will retry the banner request.",
@@ -199,11 +242,13 @@ export const showAdMobBanner = async ({ force = false } = {}) => {
     const initialized = await initializeAdMob();
     if (!admobModule || !initialized) {
       setBannerStatus("failed");
+      releaseAdMobBannerLayoutSpace();
       return false;
     }
 
     const adId = getAdMobBannerAdUnitId();
     setBannerStatus("loading");
+    reserveAdMobBannerLayoutSpace();
     startBannerLoadTimeout();
     logAdMobInfo(`${USE_TEST_ADS ? "test" : "live"} banner request`, { adId });
 
@@ -230,6 +275,7 @@ export const hideAdMobBanner = async () => {
 
     await admobModule.AdMob.hideBanner();
     setBannerStatus("hidden");
+    releaseAdMobBannerLayoutSpace();
     return true;
   } catch (error) {
     logAdMobError("hide banner", error);
@@ -245,14 +291,17 @@ export const removeAdMobBanner = async () => {
     const admobModule = await loadAdMobModule();
     if (!admobModule) {
       setBannerStatus("idle");
+      releaseAdMobBannerLayoutSpace();
       return false;
     }
 
     await admobModule.AdMob.removeBanner();
     setBannerStatus("idle");
+    releaseAdMobBannerLayoutSpace();
     return true;
   } catch (error) {
     setBannerStatus("failed");
+    releaseAdMobBannerLayoutSpace();
     logAdMobError("remove banner", error);
     return false;
   }
