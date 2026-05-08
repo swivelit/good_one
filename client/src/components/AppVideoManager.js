@@ -4,6 +4,7 @@ import {
   getAdMobBannerStatus,
   removeAdMobBanner,
   showAdMobBanner,
+  syncAdMobBannerLayoutForViewport,
 } from "../services/admob";
 
 const POPUP_REPEAT_INTERVAL_MS = 20000;
@@ -16,38 +17,16 @@ const DEFAULT_BOTTOM_AD_RESERVED_PX = 50;
 const DRAG_THRESHOLD_PX = 7;
 const ADMOB_BANNER_HEIGHT_CSS_VARIABLE = "--goodone-admob-banner-height";
 const NATIVE_BOTTOM_NAV_HEIGHT_CSS_VARIABLE = "--goodone-native-bottom-nav-height";
+const VIEWPORT_HEIGHT_CSS_VARIABLE = "--goodone-viewport-height";
+const VIEWPORT_WIDTH_CSS_VARIABLE = "--goodone-viewport-width";
 const ADMOB_LAYOUT_EVENT = "goodone:admob-banner-layout-change";
+const NATIVE_SAFE_AREA_EVENT = "goodone:native-safe-area-change";
 const VIDEO_SRC = "/media/goodone-intro.mp4";
 
 const getWindowSize = () => ({
   width: window.visualViewport?.width || window.innerWidth,
   height: window.visualViewport?.height || window.innerHeight,
 });
-
-const getSafeAreaInsets = () => {
-  if (typeof document === "undefined") return { top: 0, right: 0, bottom: 0, left: 0 };
-
-  const probe = document.createElement("div");
-  probe.style.cssText = [
-    "position:fixed",
-    "visibility:hidden",
-    "pointer-events:none",
-    "padding-top:env(safe-area-inset-top)",
-    "padding-right:env(safe-area-inset-right)",
-    "padding-bottom:env(safe-area-inset-bottom)",
-    "padding-left:env(safe-area-inset-left)",
-  ].join(";");
-  document.body.appendChild(probe);
-  const styles = window.getComputedStyle(probe);
-  const insets = {
-    top: parseFloat(styles.paddingTop) || 0,
-    right: parseFloat(styles.paddingRight) || 0,
-    bottom: parseFloat(styles.paddingBottom) || 0,
-    left: parseFloat(styles.paddingLeft) || 0,
-  };
-  probe.remove();
-  return insets;
-};
 
 const getCssPixelValue = (name, fallback = 0) => {
   if (typeof document === "undefined") return fallback;
@@ -63,6 +42,38 @@ const setRootCssPixelValue = (name, value) => {
   const numericValue = Math.max(0, Math.ceil(Number(value) || 0));
   document.documentElement.style.setProperty(name, `${numericValue}px`);
 };
+
+const removeRootCssValue = (name) => {
+  if (typeof document === "undefined") return;
+
+  document.documentElement.style.removeProperty(name);
+};
+
+export const syncNativeViewportCssVariables = () => {
+  if (typeof window === "undefined") return { width: 0, height: 0 };
+
+  const width = window.visualViewport?.width || window.innerWidth;
+  const height = window.visualViewport?.height || window.innerHeight;
+
+  setRootCssPixelValue(VIEWPORT_HEIGHT_CSS_VARIABLE, height);
+  setRootCssPixelValue(VIEWPORT_WIDTH_CSS_VARIABLE, width);
+
+  return { width, height };
+};
+
+const getSafeAreaCssPixelValue = (side) => (
+  getCssPixelValue(
+    `--goodone-safe-area-${side}`,
+    getCssPixelValue(`--safe-area-inset-${side}`, 0)
+  )
+);
+
+const getSafeAreaInsets = () => ({
+  top: getSafeAreaCssPixelValue("top"),
+  right: getSafeAreaCssPixelValue("right"),
+  bottom: getSafeAreaCssPixelValue("bottom"),
+  left: getSafeAreaCssPixelValue("left"),
+});
 
 const getAdMobBannerReservedHeight = () => (
   getCssPixelValue(ADMOB_BANNER_HEIGHT_CSS_VARIABLE, DEFAULT_BOTTOM_AD_RESERVED_PX)
@@ -86,9 +97,23 @@ const getNativeBottomNavGap = () => (
   getCssPixelValue("--goodone-native-bottom-nav-gap", 0)
 );
 
-const getNativeBottomChromeReservedHeight = () => (
-  getAdMobBannerReservedHeight() + getNativeBottomNavGap() + getNativeBottomNavHeight()
+const isAdMobBannerLayoutActive = () => (
+  typeof document !== "undefined" &&
+  Boolean(document.body?.classList?.contains("goodone-admob-banner-active"))
 );
+
+const getNativeBottomChromeReservedHeight = () => {
+  const safeBottom = getSafeAreaInsets().bottom;
+  const bannerHeight = isAdMobBannerLayoutActive() ? getAdMobBannerReservedHeight() : 0;
+  const bottomNavHeight = getNativeBottomNavHeight();
+  const bottomNavGap = getNativeBottomNavGap();
+
+  if (bottomNavHeight > 0) {
+    return bottomNavHeight + bannerHeight + bottomNavGap + (bannerHeight > 0 ? safeBottom : 0);
+  }
+
+  return safeBottom + bannerHeight;
+};
 
 export default function AppVideoManager() {
   const isNative = Capacitor.isNativePlatform();
@@ -127,7 +152,7 @@ export default function AppVideoManager() {
     const minLeft = EDGE_GAP + safe.left;
     const minTop = EDGE_GAP + safe.top;
     const maxLeft = Math.max(minLeft, viewportWidth - width - EDGE_GAP - safe.right);
-    const maxTop = Math.max(minTop, viewportHeight - height - EDGE_GAP - safe.bottom - bottomReservedHeight);
+    const maxTop = Math.max(minTop, viewportHeight - height - EDGE_GAP - bottomReservedHeight);
 
     return {
       left: Math.min(Math.max(position.left, minLeft), maxLeft),
@@ -143,7 +168,7 @@ export default function AppVideoManager() {
 
     return clampPosition({
       left: viewportWidth - width - EDGE_GAP - safe.right,
-      top: viewportHeight - height - bottomReservedHeight - EDGE_GAP - safe.bottom,
+      top: viewportHeight - height - bottomReservedHeight - EDGE_GAP,
     });
   }, [clampPosition, getWidgetSize]);
 
@@ -366,8 +391,12 @@ export default function AppVideoManager() {
     let observedBottomNav = null;
     let resizeObserver = null;
 
-    const syncNativeChromeLayout = () => {
+    const syncNativeChromeLayout = ({ shouldSyncAdMob = false } = {}) => {
       const bottomNav = document.querySelector(".native-bottom-nav");
+      syncNativeViewportCssVariables();
+      if (shouldSyncAdMob) {
+        syncAdMobBannerLayoutForViewport();
+      }
       syncNativeBottomNavHeightCssVariable();
 
       if (window.ResizeObserver && bottomNav && bottomNav !== observedBottomNav) {
@@ -389,28 +418,38 @@ export default function AppVideoManager() {
       setFloatingPosition((current) => (current ? clampPosition(current) : current));
     };
 
-    syncNativeChromeLayout();
+    const syncNativeChromeForViewportChange = () => {
+      syncNativeChromeLayout({ shouldSyncAdMob: true });
+    };
+
+    syncNativeChromeLayout({ shouldSyncAdMob: true });
 
     const mutationObserver = window.MutationObserver
       ? new MutationObserver(syncNativeChromeLayout)
       : null;
 
     mutationObserver?.observe(document.body, { childList: true, subtree: true });
-    window.addEventListener("resize", syncNativeChromeLayout);
-    window.addEventListener("orientationchange", syncNativeChromeLayout);
+    window.addEventListener("resize", syncNativeChromeForViewportChange);
+    window.addEventListener("orientationchange", syncNativeChromeForViewportChange);
     window.addEventListener(ADMOB_LAYOUT_EVENT, syncNativeChromeLayout);
-    window.visualViewport?.addEventListener("resize", syncNativeChromeLayout);
+    window.addEventListener(NATIVE_SAFE_AREA_EVENT, syncNativeChromeLayout);
+    window.visualViewport?.addEventListener("resize", syncNativeChromeForViewportChange);
+    window.visualViewport?.addEventListener("scroll", syncNativeChromeForViewportChange);
 
     return () => {
       document.body.classList.remove("goodone-native-shell-active", "goodone-admob-banner-active");
       mutationObserver?.disconnect();
       resizeObserver?.disconnect();
-      window.removeEventListener("resize", syncNativeChromeLayout);
-      window.removeEventListener("orientationchange", syncNativeChromeLayout);
+      window.removeEventListener("resize", syncNativeChromeForViewportChange);
+      window.removeEventListener("orientationchange", syncNativeChromeForViewportChange);
       window.removeEventListener(ADMOB_LAYOUT_EVENT, syncNativeChromeLayout);
-      window.visualViewport?.removeEventListener("resize", syncNativeChromeLayout);
+      window.removeEventListener(NATIVE_SAFE_AREA_EVENT, syncNativeChromeLayout);
+      window.visualViewport?.removeEventListener("resize", syncNativeChromeForViewportChange);
+      window.visualViewport?.removeEventListener("scroll", syncNativeChromeForViewportChange);
       setRootCssPixelValue(NATIVE_BOTTOM_NAV_HEIGHT_CSS_VARIABLE, 0);
       setRootCssPixelValue(ADMOB_BANNER_HEIGHT_CSS_VARIABLE, 0);
+      removeRootCssValue(VIEWPORT_HEIGHT_CSS_VARIABLE);
+      removeRootCssValue(VIEWPORT_WIDTH_CSS_VARIABLE);
     };
   }, [clampPosition, isNative]);
 
@@ -476,10 +515,12 @@ export default function AppVideoManager() {
     window.addEventListener("resize", handleResize);
     window.addEventListener("orientationchange", handleResize);
     window.visualViewport?.addEventListener("resize", handleResize);
+    window.visualViewport?.addEventListener("scroll", handleResize);
     return () => {
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("orientationchange", handleResize);
       window.visualViewport?.removeEventListener("resize", handleResize);
+      window.visualViewport?.removeEventListener("scroll", handleResize);
     };
   }, [clampPosition, isNative, savePosition]);
 

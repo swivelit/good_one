@@ -2,8 +2,10 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Capacitor } from '@capacitor/core';
 import { AdMob } from '@capacitor-community/admob';
 import App from './App';
-import AppVideoManager from './components/AppVideoManager';
+import AppVideoManager, { syncNativeViewportCssVariables } from './components/AppVideoManager';
 import MobileWelcomePage from './pages/MobileWelcomePage';
+
+const mockAdMobListeners = {};
 
 jest.mock('@capacitor/core', () => ({
   Capacitor: {
@@ -17,7 +19,10 @@ jest.mock('@capacitor-community/admob', () => ({
     initialize: jest.fn(() => Promise.resolve()),
     requestConsentInfo: jest.fn(() => Promise.resolve({ canRequestAds: true })),
     showConsentForm: jest.fn(() => Promise.resolve({ canRequestAds: true })),
-    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    addListener: jest.fn((eventName, callback) => {
+      mockAdMobListeners[eventName] = callback;
+      return { remove: jest.fn() };
+    }),
     showBanner: jest.fn(() => Promise.resolve()),
     hideBanner: jest.fn(() => Promise.resolve()),
     removeBanner: jest.fn(() => Promise.resolve()),
@@ -62,6 +67,8 @@ jest.mock('react-router-dom', () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  document.body.className = '';
+  document.documentElement.removeAttribute('style');
   jest.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve());
   Capacitor.isNativePlatform.mockReturnValue(false);
   Capacitor.getPlatform.mockReturnValue('android');
@@ -115,6 +122,37 @@ test('AppVideoManager renders splash only in native Capacitor mode', () => {
   expect(container.querySelector('.app-video-splash')).toBeInTheDocument();
 });
 
+test('AppVideoManager adds the native body class in native Capacitor mode', () => {
+  Capacitor.isNativePlatform.mockReturnValue(true);
+
+  render(<AppVideoManager />);
+
+  expect(document.body).toHaveClass('goodone-native-shell-active');
+});
+
+test('syncNativeViewportCssVariables writes visualViewport dimensions to CSS variables', () => {
+  const previousVisualViewport = window.visualViewport;
+  Object.defineProperty(window, 'visualViewport', {
+    configurable: true,
+    value: {
+      width: 390,
+      height: 741,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+    },
+  });
+
+  syncNativeViewportCssVariables();
+
+  expect(document.documentElement.style.getPropertyValue('--goodone-viewport-height')).toBe('741px');
+  expect(document.documentElement.style.getPropertyValue('--goodone-viewport-width')).toBe('390px');
+
+  Object.defineProperty(window, 'visualViewport', {
+    configurable: true,
+    value: previousVisualViewport,
+  });
+});
+
 const POPUP_REPEAT_INTERVAL_MS = 20000;
 const LOCAL_VIDEO_DURATION_MS = 10000;
 const INTRO_TIMEOUT_MS = LOCAL_VIDEO_DURATION_MS;
@@ -166,6 +204,11 @@ const expectLastBannerAdId = (adId) => {
   );
 };
 
+const getMockAdMobListener = (eventName) => (
+  mockAdMobListeners[eventName] ||
+  AdMob.addListener.mock.calls.find(([registeredEventName]) => registeredEventName === eventName)?.[1]
+);
+
 const showBannerWithIsolatedAdMobEnv = async (envValue) => {
   const previousEnvValue = process.env.REACT_APP_USE_ADMOB_TEST_ADS;
 
@@ -204,6 +247,65 @@ test('AppVideoManager shows AdMob after the 10-second launch video', async () =>
   expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
   expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
   expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
+});
+
+test('AdMob SizeChanged updates the reserved banner height CSS variable', async () => {
+  Object.keys(mockAdMobListeners).forEach((eventName) => {
+    delete mockAdMobListeners[eventName];
+  });
+  await showBannerWithIsolatedAdMobEnv(undefined);
+
+  const sizeChangedListener = getMockAdMobListener('SizeChanged');
+  expect(sizeChangedListener).toEqual(expect.any(Function));
+
+  act(() => {
+    sizeChangedListener({ width: 390, height: 72 });
+  });
+
+  expect(document.documentElement.style.getPropertyValue('--goodone-admob-banner-height')).toBe('72px');
+});
+
+test('AppVideoManager updates the native bottom nav height CSS variable when nav exists', () => {
+  Capacitor.isNativePlatform.mockReturnValue(true);
+  const rectSpy = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    .mockImplementation(function getBoundingClientRect() {
+      if (this.classList?.contains('native-bottom-nav')) {
+        return {
+          width: 390,
+          height: 86,
+          top: 0,
+          right: 390,
+          bottom: 86,
+          left: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => {},
+        };
+      }
+
+      return {
+        width: 0,
+        height: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      };
+    });
+
+  render(
+    <>
+      <nav className="native-bottom-nav" aria-label="Native navigation" />
+      <AppVideoManager />
+    </>
+  );
+
+  expect(document.documentElement.style.getPropertyValue('--goodone-native-bottom-nav-height')).toBe('86px');
+
+  rectSpy.mockRestore();
 });
 
 test('AppVideoManager shows local popup video after the 10-second AdMob phase while keeping the bottom banner', async () => {

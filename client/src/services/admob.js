@@ -11,10 +11,9 @@ const GOOGLE_DEMO_BANNER_AD_UNIT_IDS = {
 };
 
 const BANNER_BOTTOM_MARGIN_PX = 0;
-const PHONE_BANNER_HEIGHT_PX = 50;
-const LARGE_PHONE_BANNER_HEIGHT_PX = 60;
-const TABLET_BANNER_HEIGHT_PX = 90;
-export const DEFAULT_ADMOB_BANNER_HEIGHT_PX = PHONE_BANNER_HEIGHT_PX;
+const MIN_ADAPTIVE_BANNER_HEIGHT_PX = 50;
+const MAX_ADAPTIVE_BANNER_HEIGHT_PX = 90;
+export const DEFAULT_ADMOB_BANNER_HEIGHT_PX = MIN_ADAPTIVE_BANNER_HEIGHT_PX;
 const BANNER_LOAD_TIMEOUT_MS = 8000;
 const BANNER_HEIGHT_CSS_VARIABLE = "--goodone-admob-banner-height";
 const BANNER_LAYOUT_EVENT = "goodone:admob-banner-layout-change";
@@ -28,6 +27,8 @@ let areBannerListenersRegistered = false;
 let bannerStatus = "idle";
 let bannerLoadTimeout = null;
 let lastKnownBannerHeightPx = DEFAULT_ADMOB_BANNER_HEIGHT_PX;
+let lastMeasuredBannerHeightPx = 0;
+let reservedBannerLayoutHeightPx = 0;
 
 const isNativePlatform = () => Capacitor.isNativePlatform();
 
@@ -55,22 +56,41 @@ export const isAdMobBannerRequestActive = () => (
   bannerStatus === "loading" || bannerStatus === "loaded"
 );
 
-const getEstimatedBannerLayoutHeight = () => {
-  if (typeof window === "undefined") return DEFAULT_ADMOB_BANNER_HEIGHT_PX;
+const getViewportSize = () => {
+  if (typeof window === "undefined") return { width: 0, height: 0 };
 
-  const viewportWidth = Math.max(
+  const width = Math.max(
     Number(window.visualViewport?.width) || 0,
     Number(window.innerWidth) || 0,
     Number(window.screen?.width) || 0
   );
-  if (viewportWidth >= 720) return TABLET_BANNER_HEIGHT_PX;
-  if (viewportWidth >= 468) return LARGE_PHONE_BANNER_HEIGHT_PX;
+  const height = Math.max(
+    Number(window.visualViewport?.height) || 0,
+    Number(window.innerHeight) || 0,
+    Number(window.screen?.height) || 0
+  );
 
-  return PHONE_BANNER_HEIGHT_PX;
+  return { width, height };
 };
 
-const normalizeBannerHeight = (height) => {
-  const fallbackHeight = getEstimatedBannerLayoutHeight();
+const getEstimatedBannerLayoutHeight = () => {
+  if (typeof window === "undefined") return DEFAULT_ADMOB_BANNER_HEIGHT_PX;
+
+  const { width, height } = getViewportSize();
+  if (!width && !height) return DEFAULT_ADMOB_BANNER_HEIGHT_PX;
+
+  const viewportWidthEstimate = width ? width / 8 : MAX_ADAPTIVE_BANNER_HEIGHT_PX;
+  const viewportHeightCap = height ? height * 0.15 : MAX_ADAPTIVE_BANNER_HEIGHT_PX;
+  return Math.ceil(Math.min(
+    MAX_ADAPTIVE_BANNER_HEIGHT_PX,
+    Math.max(
+      MIN_ADAPTIVE_BANNER_HEIGHT_PX,
+      Math.min(viewportWidthEstimate, viewportHeightCap)
+    )
+  ));
+};
+
+const normalizeBannerHeight = (height, fallbackHeight = getEstimatedBannerLayoutHeight()) => {
   const numericHeight = Number(height);
   if (!Number.isFinite(numericHeight) || numericHeight <= 0) {
     return fallbackHeight;
@@ -91,6 +111,9 @@ const setAdMobBannerLayoutHeight = (height) => {
   if (typeof document === "undefined") return;
 
   const normalizedHeight = Math.max(0, Math.ceil(Number(height) || 0));
+  const didReservedHeightChange = normalizedHeight !== reservedBannerLayoutHeightPx;
+  reservedBannerLayoutHeightPx = normalizedHeight;
+
   document.documentElement.style.setProperty(
     BANNER_HEIGHT_CSS_VARIABLE,
     `${normalizedHeight}px`
@@ -102,12 +125,18 @@ const setAdMobBannerLayoutHeight = (height) => {
     document.body?.classList?.remove("goodone-admob-banner-active");
   }
 
-  emitAdMobBannerLayoutChange(normalizedHeight);
+  if (didReservedHeightChange) {
+    emitAdMobBannerLayoutChange(normalizedHeight);
+  }
 };
 
-const reserveAdMobBannerLayoutSpace = (height = lastKnownBannerHeightPx) => {
-  const normalizedHeight = normalizeBannerHeight(height);
+const reserveAdMobBannerLayoutSpace = (height = lastMeasuredBannerHeightPx || getEstimatedBannerLayoutHeight(), { measured = false } = {}) => {
+  const fallbackHeight = lastMeasuredBannerHeightPx || getEstimatedBannerLayoutHeight();
+  const normalizedHeight = normalizeBannerHeight(height, fallbackHeight);
   lastKnownBannerHeightPx = normalizedHeight;
+  if (measured) {
+    lastMeasuredBannerHeightPx = normalizedHeight;
+  }
   setAdMobBannerLayoutHeight(normalizedHeight);
 };
 
@@ -138,7 +167,11 @@ const setBannerStatus = (nextStatus) => {
 
 const markBannerLoaded = (source, data = {}) => {
   clearBannerLoadTimeout();
-  reserveAdMobBannerLayoutSpace(data?.height || lastKnownBannerHeightPx);
+  const measuredHeight = Number(data?.height) > 0 ? data.height : null;
+  reserveAdMobBannerLayoutSpace(
+    measuredHeight || lastMeasuredBannerHeightPx || getEstimatedBannerLayoutHeight(),
+    { measured: Boolean(measuredHeight) }
+  );
   setBannerStatus("loaded");
   logAdMobInfo(`banner loaded via ${source}`, data);
 };
@@ -162,6 +195,17 @@ const startBannerLoadTimeout = () => {
       });
     }
   }, BANNER_LOAD_TIMEOUT_MS);
+};
+
+export const syncAdMobBannerLayoutForViewport = () => {
+  if (!isAdMobBannerRequestActive()) {
+    return reservedBannerLayoutHeightPx;
+  }
+
+  reserveAdMobBannerLayoutSpace(
+    lastMeasuredBannerHeightPx || getEstimatedBannerLayoutHeight()
+  );
+  return reservedBannerLayoutHeightPx;
 };
 
 const loadAdMobModule = async () => {
