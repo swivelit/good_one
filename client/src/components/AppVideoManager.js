@@ -12,7 +12,7 @@ const INTRO_TIMEOUT_MS = LOCAL_VIDEO_DURATION_MS;
 const GOOGLE_AD_DURATION_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
 const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
-const DEFAULT_BOTTOM_AD_RESERVED_PX = 68;
+const DEFAULT_BOTTOM_AD_RESERVED_PX = 50;
 const DRAG_THRESHOLD_PX = 7;
 const ADMOB_BANNER_HEIGHT_CSS_VARIABLE = "--goodone-admob-banner-height";
 const NATIVE_BOTTOM_NAV_HEIGHT_CSS_VARIABLE = "--goodone-native-bottom-nav-height";
@@ -82,8 +82,12 @@ const syncNativeBottomNavHeightCssVariable = () => {
   return bottomNavHeight;
 };
 
+const getNativeBottomNavGap = () => (
+  getCssPixelValue("--goodone-native-bottom-nav-gap", 0)
+);
+
 const getNativeBottomChromeReservedHeight = () => (
-  getAdMobBannerReservedHeight() + getNativeBottomNavHeight()
+  getAdMobBannerReservedHeight() + getNativeBottomNavGap() + getNativeBottomNavHeight()
 );
 
 export default function AppVideoManager() {

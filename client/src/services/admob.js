@@ -11,10 +11,10 @@ const GOOGLE_DEMO_BANNER_AD_UNIT_IDS = {
 };
 
 const BANNER_BOTTOM_MARGIN_PX = 0;
-const BANNER_LAYOUT_GUARD_PX = 8;
-const PHONE_BANNER_HEIGHT_PX = 60;
+const PHONE_BANNER_HEIGHT_PX = 50;
+const LARGE_PHONE_BANNER_HEIGHT_PX = 60;
 const TABLET_BANNER_HEIGHT_PX = 90;
-export const DEFAULT_ADMOB_BANNER_HEIGHT_PX = PHONE_BANNER_HEIGHT_PX + BANNER_LAYOUT_GUARD_PX;
+export const DEFAULT_ADMOB_BANNER_HEIGHT_PX = PHONE_BANNER_HEIGHT_PX;
 const BANNER_LOAD_TIMEOUT_MS = 8000;
 const BANNER_HEIGHT_CSS_VARIABLE = "--goodone-admob-banner-height";
 const BANNER_LAYOUT_EVENT = "goodone:admob-banner-layout-change";
@@ -63,11 +63,10 @@ const getEstimatedBannerLayoutHeight = () => {
     Number(window.innerWidth) || 0,
     Number(window.screen?.width) || 0
   );
-  const expectedBannerHeight = viewportWidth >= 720
-    ? TABLET_BANNER_HEIGHT_PX
-    : PHONE_BANNER_HEIGHT_PX;
+  if (viewportWidth >= 720) return TABLET_BANNER_HEIGHT_PX;
+  if (viewportWidth >= 468) return LARGE_PHONE_BANNER_HEIGHT_PX;
 
-  return expectedBannerHeight + BANNER_LAYOUT_GUARD_PX;
+  return PHONE_BANNER_HEIGHT_PX;
 };
 
 const normalizeBannerHeight = (height) => {
@@ -77,10 +76,7 @@ const normalizeBannerHeight = (height) => {
     return fallbackHeight;
   }
 
-  return Math.max(
-    DEFAULT_ADMOB_BANNER_HEIGHT_PX,
-    Math.ceil(numericHeight) + BANNER_LAYOUT_GUARD_PX
-  );
+  return Math.max(0, Math.ceil(numericHeight));
 };
 
 const emitAdMobBannerLayoutChange = (height) => {
