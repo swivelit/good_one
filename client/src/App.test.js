@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Capacitor } from '@capacitor/core';
 import { AdMob } from '@capacitor-community/admob';
@@ -103,6 +105,16 @@ test('MobileWelcomePage renders native auth choices', () => {
   expect(screen.getByText(/Create Customer Account/i)).toBeInTheDocument();
   expect(screen.getByText(/Become a Vendor/i)).toBeInTheDocument();
   expect(screen.getByText(/Continue Browsing/i)).toBeInTheDocument();
+});
+
+test('native topbar CSS stays white without covering the header or AdMob bottom variables', () => {
+  const css = fs.readFileSync(path.join(__dirname, 'index.css'), 'utf8');
+  const topbarRule = css.match(/\.native-topbar\s*\{[\s\S]*?\}/)?.[0] || '';
+
+  expect(css).not.toMatch(/\.native-topbar::before/);
+  expect(topbarRule).toMatch(/background:\s*#fff\s*;/);
+  expect(css).toMatch(/--goodone-admob-banner-height\s*:/);
+  expect(css).toMatch(/--goodone-native-bottom-nav-height\s*:/);
 });
 
 test('AppVideoManager stays hidden on web', () => {

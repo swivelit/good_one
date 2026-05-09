@@ -1,6 +1,7 @@
 package com.goodone.marketplace;
 
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -22,6 +23,8 @@ import java.util.Locale;
 
 public class MainActivity extends BridgeActivity {
     private static final String GOODONE_SAFE_AREA_CHANGE_EVENT = "goodone:native-safe-area-change";
+    private static final int STATUS_BAR_COLOR = Color.rgb(17, 24, 39);
+    private static final int APP_WINDOW_BACKGROUND_COLOR = Color.WHITE;
 
     private Insets lastSafeAreaInsets = Insets.of(0, 0, 0, 0);
     private View adMobInsetGuardRoot;
@@ -33,6 +36,7 @@ public class MainActivity extends BridgeActivity {
         bridgeBuilder.addWebViewListener(new WebViewListener() {
             @Override
             public void onPageLoaded(WebView webView) {
+                webView.setBackgroundColor(APP_WINDOW_BACKGROUND_COLOR);
                 injectSafeAreaInsetsCss(webView, lastSafeAreaInsets);
             }
         });
@@ -53,7 +57,9 @@ public class MainActivity extends BridgeActivity {
     private void configureEdgeToEdgeWindow() {
         Window window = getWindow();
         WindowCompat.setDecorFitsSystemWindows(window, false);
-        window.setStatusBarColor(Color.TRANSPARENT);
+        window.setBackgroundDrawable(new ColorDrawable(APP_WINDOW_BACKGROUND_COLOR));
+        window.getDecorView().setBackgroundColor(APP_WINDOW_BACKGROUND_COLOR);
+        window.setStatusBarColor(STATUS_BAR_COLOR);
         window.setNavigationBarColor(Color.TRANSPARENT);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -76,6 +82,8 @@ public class MainActivity extends BridgeActivity {
     private void installSafeAreaInsetsBridge() {
         WebView webView = getBridge() == null ? null : getBridge().getWebView();
         if (webView == null) return;
+
+        webView.setBackgroundColor(APP_WINDOW_BACKGROUND_COLOR);
 
         ViewCompat.setOnApplyWindowInsetsListener(webView, (view, windowInsets) -> {
             Insets insets = windowInsets.getInsets(
@@ -103,7 +111,8 @@ public class MainActivity extends BridgeActivity {
     private void injectSafeAreaInsetsCss(WebView webView, Insets insets) {
         if (webView == null) return;
 
-        int top = pxToCssPx(insets.top);
+        int rawTop = pxToCssPx(insets.top);
+        int top = pxToCssPx(getUnconsumedTopInsetPx(webView, insets.top));
         int right = pxToCssPx(insets.right);
         int bottom = pxToCssPx(insets.bottom);
         int left = pxToCssPx(insets.left);
@@ -114,16 +123,32 @@ public class MainActivity extends BridgeActivity {
                 "s.setProperty('--safe-area-inset-right','%2$dpx');" +
                 "s.setProperty('--safe-area-inset-bottom','%3$dpx');" +
                 "s.setProperty('--safe-area-inset-left','%4$dpx');" +
-                "window.dispatchEvent(new CustomEvent('%5$s',{detail:{top:%1$d,right:%2$d,bottom:%3$d,left:%4$d}}));" +
+                "s.setProperty('--goodone-raw-safe-area-inset-top','%5$dpx');" +
+                "window.dispatchEvent(new CustomEvent('%6$s',{detail:{top:%1$d,right:%2$d,bottom:%3$d,left:%4$d}}));" +
             "})();",
             top,
             right,
             bottom,
             left,
+            rawTop,
             GOODONE_SAFE_AREA_CHANGE_EVENT
         );
 
         webView.post(() -> webView.evaluateJavascript(script, null));
+    }
+
+    private int getUnconsumedTopInsetPx(WebView webView, int rawTopInsetPx) {
+        if (webView == null || rawTopInsetPx <= 0) return Math.max(0, rawTopInsetPx);
+
+        int[] location = new int[2];
+        webView.getLocationOnScreen(location);
+        int webViewTopOnScreenPx = Math.max(0, location[1]);
+
+        if (webViewTopOnScreenPx >= rawTopInsetPx - 2) {
+            return 0;
+        }
+
+        return Math.max(0, rawTopInsetPx - webViewTopOnScreenPx);
     }
 
     private int pxToCssPx(int px) {

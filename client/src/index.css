@@ -16,7 +16,7 @@
   --goodone-safe-area-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --goodone-safe-area-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   --goodone-safe-area-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
-  --goodone-status-bar-background: #111827;
+  --goodone-native-topbar-safe-area: clamp(0px, var(--goodone-safe-area-top, 0px), 48px);
   --goodone-admob-banner-height: 0px;
   --goodone-native-bottom-nav-height: 64px;
   --goodone-native-bottom-nav-gap: 0px;
@@ -438,29 +438,11 @@ body.goodone-admob-banner-active .native-app-shell.native-with-bottom-nav {
   position: sticky;
   top: 0;
   z-index: 1040;
-  background: rgba(255, 255, 255, 0.96);
+  background: #fff;
   border-bottom: 1px solid rgba(44, 62, 80, 0.08);
   box-shadow: 0 2px 14px rgba(0, 0, 0, 0.06);
-  padding: calc(0.65rem + var(--goodone-safe-area-top)) 1rem 0.65rem;
+  padding: calc(0.65rem + var(--goodone-native-topbar-safe-area)) 1rem 0.65rem;
   backdrop-filter: blur(14px);
-}
-
-.native-topbar::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: var(--goodone-safe-area-top);
-  background: var(--goodone-status-bar-background);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.native-topbar-row,
-.native-search-form {
-  position: relative;
-  z-index: 1;
 }
 
 .native-topbar-row {
