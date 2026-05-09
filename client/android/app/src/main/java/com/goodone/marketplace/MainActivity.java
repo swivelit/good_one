@@ -8,8 +8,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.Window;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -32,11 +34,12 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
         configureEdgeToEdgeWindow();
         bridgeBuilder.addWebViewListener(new WebViewListener() {
             @Override
             public void onPageLoaded(WebView webView) {
-                webView.setBackgroundColor(APP_WINDOW_BACKGROUND_COLOR);
+                configureWebView(webView);
                 injectSafeAreaInsetsCss(webView, lastSafeAreaInsets);
             }
         });
@@ -79,11 +82,21 @@ public class MainActivity extends BridgeActivity {
         controller.setAppearanceLightNavigationBars(true);
     }
 
+    private void configureWebView(WebView webView) {
+        if (webView == null) return;
+
+        webView.setBackgroundColor(APP_WINDOW_BACKGROUND_COLOR);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            webView.getSettings().setForceDark(WebSettings.FORCE_DARK_OFF);
+        }
+    }
+
     private void installSafeAreaInsetsBridge() {
         WebView webView = getBridge() == null ? null : getBridge().getWebView();
         if (webView == null) return;
 
-        webView.setBackgroundColor(APP_WINDOW_BACKGROUND_COLOR);
+        configureWebView(webView);
 
         ViewCompat.setOnApplyWindowInsetsListener(webView, (view, windowInsets) -> {
             Insets insets = windowInsets.getInsets(

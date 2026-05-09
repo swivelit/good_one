@@ -445,6 +445,11 @@ body.goodone-admob-banner-active .native-app-shell.native-with-bottom-nav {
   backdrop-filter: blur(14px);
 }
 
+body.goodone-native-shell-active .native-topbar {
+  background: #fff !important;
+  color: var(--secondary) !important;
+}
+
 .native-topbar-row {
   display: flex;
   align-items: center;

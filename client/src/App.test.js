@@ -8,6 +8,14 @@ import AppVideoManager, { syncNativeViewportCssVariables } from './components/Ap
 import MobileWelcomePage from './pages/MobileWelcomePage';
 
 const mockAdMobListeners = {};
+const androidResDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res');
+
+const walkFiles = (directory) => (
+  fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    return entry.isDirectory() ? walkFiles(entryPath) : entryPath;
+  })
+);
 
 jest.mock('@capacitor/core', () => ({
   Capacitor: {
@@ -110,11 +118,33 @@ test('MobileWelcomePage renders native auth choices', () => {
 test('native topbar CSS stays white without covering the header or AdMob bottom variables', () => {
   const css = fs.readFileSync(path.join(__dirname, 'index.css'), 'utf8');
   const topbarRule = css.match(/\.native-topbar\s*\{[\s\S]*?\}/)?.[0] || '';
+  const nativeModeTopbarRule = css.match(/body\.goodone-native-shell-active\s+\.native-topbar\s*\{[\s\S]*?\}/)?.[0] || '';
 
   expect(css).not.toMatch(/\.native-topbar::before/);
   expect(topbarRule).toMatch(/background:\s*#fff\s*;/);
+  expect(nativeModeTopbarRule).toMatch(/background:\s*#fff\s*!important\s*;/);
+  expect(nativeModeTopbarRule).toMatch(/color:\s*var\(--secondary\)\s*!important\s*;/);
   expect(css).toMatch(/--goodone-admob-banner-height\s*:/);
   expect(css).toMatch(/--goodone-native-bottom-nav-height\s*:/);
+});
+
+test('Android launch theme stays light without native splash resources', () => {
+  const styles = fs.readFileSync(path.join(androidResDir, 'values', 'styles.xml'), 'utf8');
+
+  expect(styles).not.toMatch(/Theme\.SplashScreen/);
+  expect(styles).not.toMatch(/@drawable\/splash/);
+  expect(styles).not.toMatch(/DayNight\.NoActionBar/);
+  expect(styles).toMatch(/Theme\.AppCompat\.Light\.NoActionBar/);
+  expect(styles).toMatch(/android:forceDarkAllowed/);
+  expect(styles).toMatch(/@android:color\/white/);
+});
+
+test('Android night resources do not include splash PNGs', () => {
+  const nightSplashFiles = walkFiles(androidResDir)
+    .map((filePath) => path.relative(androidResDir, filePath).split(path.sep).join('/'))
+    .filter((filePath) => /night.*splash\.png/i.test(filePath));
+
+  expect(nightSplashFiles).toEqual([]);
 });
 
 test('AppVideoManager stays hidden on web', () => {
