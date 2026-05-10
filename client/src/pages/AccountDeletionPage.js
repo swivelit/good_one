@@ -39,8 +39,9 @@ export default function AccountDeletionPage() {
         <>
           <div className="alert alert-danger">
             <strong>This action is permanent.</strong> Deleting your account will
-            remove your GoodOne account and related marketplace data where
-            possible. You will need to create a new account to use GoodOne again.
+            remove your GoodOne account, vendor profile, listings, uploads, and
+            related marketplace data where possible. You will need to create a
+            new account to use GoodOne again.
           </div>
           <button
             type="button"
@@ -57,11 +58,28 @@ export default function AccountDeletionPage() {
           </button>
         </>
       ) : (
-        <div className="alert alert-info">
-          Please <Link to="/login">login</Link> first to delete your account, or
-          contact <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>{" "}
-          from the email address tied to your account.
-        </div>
+        <>
+          <div className="alert alert-info">
+            You can <Link to="/login">login</Link> and delete your account from
+            this page, or request deletion by email.
+          </div>
+          <div className="border rounded-3 p-4 bg-light">
+            <h5 className="fw-bold mb-3">Request Deletion By Email</h5>
+            <p className="mb-2">
+              Email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>{" "}
+              from the email address linked to your GoodOne account.
+            </p>
+            <p className="mb-2">
+              Use the subject <strong>GoodOne account deletion request</strong>.
+            </p>
+            <p className="mb-0">
+              GoodOne will delete your account, vendor profile, listings,
+              uploads, and related marketplace data where possible. Some records
+              may be retained when required for security, legal compliance,
+              dispute handling, fraud prevention, or service integrity.
+            </p>
+          </div>
+        </>
       )}
     </main>
   );

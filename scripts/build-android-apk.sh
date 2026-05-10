@@ -32,16 +32,26 @@ fi
 echo ""
 echo "Checking Java..."
 if command -v /usr/libexec/java_home >/dev/null 2>&1; then
-  if /usr/libexec/java_home -v 17 >/dev/null 2>&1; then
-    export JAVA_HOME="$(/usr/libexec/java_home -v 17)"
+  use_java_version() {
+    local requested_version="$1"
+    local java_home
+    java_home="$(/usr/libexec/java_home -v "$requested_version" 2>/dev/null)" || return 1
+
+    if ! "$java_home/bin/java" -version 2>&1 | grep -Eq "version \"${requested_version}([\".+_-]|$)"; then
+      return 1
+    fi
+
+    export JAVA_HOME="$java_home"
     export PATH="$JAVA_HOME/bin:$PATH"
-    echo "Using Java 17: $JAVA_HOME"
-  elif /usr/libexec/java_home -v 21 >/dev/null 2>&1; then
-    export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
-    export PATH="$JAVA_HOME/bin:$PATH"
-    echo "Using Java 21: $JAVA_HOME"
+    echo "Using Java $requested_version: $JAVA_HOME"
+  }
+
+  if use_java_version 21; then
+    :
+  elif use_java_version 17; then
+    :
   else
-    echo "WARNING: Java 17/21 not found via /usr/libexec/java_home."
+    echo "WARNING: Java 21/17 not found via /usr/libexec/java_home."
     echo "Continuing with current Java:"
     java -version || true
   fi

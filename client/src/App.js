@@ -20,6 +20,7 @@ import ProfilePage from './pages/ProfilePage';
 import NotFound from './pages/NotFoundPage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import AccountDeletionPage from './pages/AccountDeletionPage';
+import TermsOfUse from './pages/TermsOfUse';
 
 const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter;
 
@@ -62,6 +63,7 @@ function AppRoutes() {
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/vendors/:id" element={<VendorProfile />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfUse />} />
         <Route path="/account-deletion" element={<AccountDeletionPage />} />
         <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
         <Route path="/account" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />

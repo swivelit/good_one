@@ -34,18 +34,31 @@ keyAlias=goodone-upload
 keyPassword=YOUR_KEY_PASSWORD
 ```
 
-## 3. Build and verify the release AAB
+## 3. Build and verify the release AAB/APK
+
+From `client`:
 
 ```bash
 cd client
-npm run build:android:release
-npm run verify:android:release
+npm run build:android:release:apk
 ```
 
-The output is:
+Or from the repository root:
+
+```bash
+bash scripts/build-android_release-apk.sh
+```
+
+The outputs are:
 
 ```text
-client/android/app/build/outputs/bundle/release/app-release.aab
+dist/goodone-release.aab
+dist/goodone-release.apk
 ```
 
-Do not use the debug APK for Play Store production.
+Upload `dist/goodone-release.aab` to Google Play. `dist/goodone-release.apk` is
+for local QA only. Do not click live AdMob ads during testing; use debug builds
+or configured test devices for ad testing.
+
+Do not commit `.jks`, `.keystore`, `key.properties`, APK, AAB, or signing
+secrets.

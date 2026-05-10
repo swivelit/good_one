@@ -34,6 +34,7 @@ export default function Footer() {
               <li className="mb-2"><a href="/#" className=" text-decoration-none">Help Center</a></li>
               <li className="mb-2"><a href="/#" className="text-decoration-none">Safety Tips</a></li>
               <li className="mb-2"><a href={`mailto:${SUPPORT_EMAIL}`} className=" text-decoration-none">Contact Support</a></li>
+              <li className="mb-2"><Link to="/terms" className=" text-decoration-none">Terms of Use</Link></li>
               <li className="mb-2"><Link to="/privacy" className=" text-decoration-none">Privacy Policy</Link></li>
               <li className="mb-2"><Link to="/account-deletion" className=" text-decoration-none">Delete Account</Link></li>
             </ul>

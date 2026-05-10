@@ -34,7 +34,12 @@ The current Capacitor app id and Android package are `com.goodone.marketplace`. 
 Public policy routes are available without login:
 
 - `/privacy`
+- `/terms`
 - `/account-deletion`
+
+`client/public/app-ads.txt` is included for AdMob seller verification. This only
+works if the deployed frontend domain is also set as the Google Play developer
+website, because `app-ads.txt` must be available at the domain root.
 
 ### App icon assets
 
@@ -44,7 +49,41 @@ Web/PWA icons are declared in `client/public/manifest.json` and served from `cli
 
 Do not commit Android keystores, `key.properties`, or signing passwords. Use `client/android/key.properties.example` as a local template for release signing values. The Android Gradle release signing config reads local `client/android/key.properties` only when that file exists.
 
-For Play Store release builds, open Android Studio and use `Build > Generate Signed Bundle / APK > Android App Bundle`. The Play Store needs a signed AAB, not just a debug APK.
+Generate an upload key locally:
+
+```sh
+cd client/android
+mkdir -p keystores
+keytool -genkeypair \
+  -v \
+  -storetype JKS \
+  -keystore keystores/goodone-upload-key.jks \
+  -alias goodone-upload \
+  -keyalg RSA \
+  -keysize 2048 \
+  -validity 10000
+```
+
+Create `client/android/key.properties` from `client/android/key.properties.example`
+and point it at the local upload key. Never commit `.jks`, `.keystore`,
+`key.properties`, APK, AAB, or signing secrets.
+
+Build signed release artifacts:
+
+```sh
+cd client
+npm run build:android:release:apk
+```
+
+Or from the repository root:
+
+```sh
+bash scripts/build-android_release-apk.sh
+```
+
+Upload `dist/goodone-release.aab` to Google Play. Use
+`dist/goodone-release.apk` for local QA only. Do not click live AdMob ads during
+testing; use debug builds or configured test devices for ad testing.
 
 Android is currently `versionCode 1` and `versionName 1.0`. Every future Play Store upload must increment `versionCode`.
 
@@ -85,14 +124,11 @@ Android:
 
 ```sh
 cd client
-npm ci
-npm run build
-npx cap sync android
-npx cap open android
+npm run build:android:release:apk
 ```
 
-- In Android Studio, use `Build > Generate Signed Bundle / APK > Android App Bundle`.
-- Output must be a signed AAB for the Play Store, not just a debug APK.
+- Play upload artifact: `dist/goodone-release.aab`
+- Local QA artifact: `dist/goodone-release.apk`
 
 iOS:
 

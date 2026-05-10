@@ -25,6 +25,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "build:android:apk": "bash ../scripts/build-android-apk.sh",
+    "build:android:release:apk": "bash ../scripts/build-android_release-apk.sh",
     "build:ios:archive": "bash ../scripts/build-ios-archive.sh",
     "test": "react-scripts test",
     "eject": "react-scripts eject",

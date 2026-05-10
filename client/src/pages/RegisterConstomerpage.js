@@ -23,6 +23,7 @@ export default function RegisterCustomer() {
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -31,6 +32,10 @@ export default function RegisterCustomer() {
   const handleSendOtp = async () => {
     if (!form.email) {
       return toast.error("Enter email first");
+    }
+
+    if (!termsAccepted) {
+      return toast.error("Please agree to the Terms of Use and Privacy Policy");
     }
 
     try {
@@ -61,6 +66,10 @@ export default function RegisterCustomer() {
   };
 
   const handleResendOtp = async () => {
+    if (!termsAccepted) {
+      return toast.error("Please agree to the Terms of Use and Privacy Policy");
+    }
+
     try {
       setResending(true);
 
@@ -93,6 +102,10 @@ export default function RegisterCustomer() {
 
     if (form.password !== form.confirmPassword) {
       return toast.error("Passwords do not match");
+    }
+
+    if (!termsAccepted) {
+      return toast.error("Please agree to the Terms of Use and Privacy Policy");
     }
 
     if (!form.otp) {
@@ -267,6 +280,21 @@ export default function RegisterCustomer() {
                   </span>
                 </div>
               </div>
+            </div>
+
+            <div className="form-check mb-4">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id="customerTerms"
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                required
+              />
+              <label className="form-check-label small" htmlFor="customerTerms">
+                I agree to the <Link to="/terms">Terms of Use</Link> and{" "}
+                <Link to="/privacy">Privacy Policy</Link>
+              </label>
             </div>
 
             {/* Submit */}

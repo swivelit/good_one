@@ -41,6 +41,7 @@ export default function RegisterVendor() {
   const [photoFile, setPhotoFile] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [timer, setTimer] = useState(30);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -142,6 +143,9 @@ export default function RegisterVendor() {
     if (form.password !== form.confirmPassword)
       return toast.error("Passwords do not match");
 
+    if (!termsAccepted)
+      return toast.error("Please agree to the Terms of Use and Privacy Policy");
+
     if (!capturedPhoto)
       return toast.error("Live photo verification is required");
 
@@ -212,6 +216,9 @@ export default function RegisterVendor() {
     e.preventDefault();
 
     const otpStr = otp.join("");
+
+    if (!termsAccepted)
+      return toast.error("Please agree to the Terms of Use and Privacy Policy");
 
     if (otpStr.length < 6) return toast.error("Enter complete 6-digit OTP");
 
@@ -302,6 +309,10 @@ export default function RegisterVendor() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
+                if (!termsAccepted) {
+                  toast.error("Please agree to the Terms of Use and Privacy Policy");
+                  return;
+                }
                 setStep(2);
               }}
             >
@@ -463,6 +474,20 @@ export default function RegisterVendor() {
                   />
                 </div>
               </div>
+              <div className="form-check mb-4">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="vendorTerms"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  required
+                />
+                <label className="form-check-label small" htmlFor="vendorTerms">
+                  I agree to the <Link to="/terms">Terms of Use</Link> and{" "}
+                  <Link to="/privacy">Privacy Policy</Link>
+                </label>
+              </div>
               <button
                 type="submit"
                 className="btn btn-primary-custom w-100 py-2"
@@ -590,7 +615,7 @@ export default function RegisterVendor() {
                   type="button"
                   className="btn btn-primary-custom flex-fill"
                   onClick={handleRegister}
-                  disabled={loading || !capturedPhoto}
+                  disabled={loading || !capturedPhoto || !termsAccepted}
                 >
                   {loading ? (
                     <span className="spinner-border spinner-border-sm me-2"></span>
@@ -652,7 +677,7 @@ export default function RegisterVendor() {
               <button
                 type="submit"
                 className="btn btn-primary-custom w-100 py-2"
-                disabled={loading}
+                disabled={loading || !termsAccepted}
               >
                 {loading ? (
                   <span className="spinner-border spinner-border-sm me-2"></span>
