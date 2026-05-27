@@ -5,6 +5,7 @@ const path = require('path');
 const prisma = require('../Db/prisma');
 const { uploadsDir } = require('../config/uploads');
 const { sanitizeUser, toCompat } = require('../utils/serialize');
+const mailSender = require('../utills/sendMail');
 
 const OTP_EXPIRES_MS = 5 * 60 * 1000;
 
@@ -13,6 +14,40 @@ const generateToken = (id) =>
 
 const isOtpExpired = (otp) =>
   !otp?.createdAt || Date.now() - new Date(otp.createdAt).getTime() > OTP_EXPIRES_MS;
+
+const deleteExpiredOtps = () =>
+  prisma.otp.deleteMany({
+    where: {
+      createdAt: { lt: new Date(Date.now() - OTP_EXPIRES_MS) },
+    },
+  });
+
+const isTestOtpEnabled = () =>
+  process.env.ENABLE_TEST_OTP === 'true' &&
+  Boolean(process.env.OTP_BYPASS_CODE);
+
+const generatePasswordResetOtp = () =>
+  isTestOtpEnabled()
+    ? process.env.OTP_BYPASS_CODE
+    : Math.floor(100000 + Math.random() * 900000).toString();
+
+const passwordResetEmailBody = (otp) => `
+  <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <h2 style="color: #2c3e50;">GoodOne Password Reset</h2>
+    <p>Hello,</p>
+    <p>Use the One-Time Password (OTP) below to reset your GoodOne password:</p>
+    <div style="margin: 20px 0; text-align: center;">
+      <span style="font-size: 24px; font-weight: bold; color: #ffffff; background: #007bff; padding: 10px 20px; border-radius: 5px;">
+        ${otp}
+      </span>
+    </div>
+    <p>This OTP is valid for <strong>5 minutes</strong>. Do not share it with anyone.</p>
+    <p>If you did not request a password reset, please ignore this email.</p>
+    <br/>
+    <p>Regards,</p>
+    <p><strong>GoodOne Team</strong></p>
+  </div>
+`;
 
 const userLookupWhere = (email, phone) => {
   const filters = [];
@@ -233,6 +268,112 @@ exports.login = async (req, res) => {
       token: generateToken(user.id),
       user: sanitizeUser(user),
       vendorProfile: toCompat(vendorProfile),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.requestPasswordResetOtp = async (req, res) => {
+  try {
+    const normalizedEmail = req.body.email?.toLowerCase().trim();
+
+    if (!normalizedEmail) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'This email is not registered',
+      });
+    }
+
+    const otp = generatePasswordResetOtp();
+
+    await deleteExpiredOtps();
+    await prisma.otp.deleteMany({ where: { email: normalizedEmail } });
+    await prisma.otp.create({ data: { email: normalizedEmail, otp } });
+
+    if (isTestOtpEnabled()) {
+      return res.status(200).json({
+        success: true,
+        message: 'OTP sent to your email',
+        testOtpEnabled: true,
+      });
+    }
+
+    await mailSender(
+      normalizedEmail,
+      'Password Reset OTP - GoodOne',
+      passwordResetEmailBody(otp)
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent to your email',
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const normalizedEmail = req.body.email?.toLowerCase().trim();
+    const otp = req.body.otp?.toString().trim();
+    const { newPassword } = req.body;
+
+    if (!normalizedEmail || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, OTP, and new password are required',
+      });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters',
+      });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'This email is not registered',
+      });
+    }
+
+    const recentOtp = await prisma.otp.findFirst({
+      where: { email: normalizedEmail },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!recentOtp || isOtpExpired(recentOtp) || recentOtp.otp.toString() !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired OTP',
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword },
+      });
+      await tx.otp.deleteMany({ where: { email: normalizedEmail } });
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully',
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

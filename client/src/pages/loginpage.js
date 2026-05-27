@@ -78,6 +78,11 @@ export default function LoginPage() {
       <i className={`bi ${showPassword ? "bi-eye-slash" : "bi-eye"}`}></i>
     </span>
   </div>
+  <div className="text-end mt-2">
+    <Link to="/forgot-password" className="small text-decoration-none">
+      Forgot password?
+    </Link>
+  </div>
 </div>
             <button type="submit" className="btn btn-primary-custom w-100 py-2" disabled={loading}>
               {loading ? <><span className="spinner-border spinner-border-sm me-2"></span>Signing in...</> : <><i className="bi bi-box-arrow-in-right me-2"></i>Sign In</>}

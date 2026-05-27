@@ -237,15 +237,19 @@ async function main() {
     await requestRawUrl(buildFrontendUrl("/login"), { method: "GET" }, [200]);
   });
 
-  await runCheck("06 Frontend /privacy", async () => {
+  await runCheck("06 Frontend /forgot-password", async () => {
+    await requestRawUrl(buildFrontendUrl("/forgot-password"), { method: "GET" }, [200]);
+  });
+
+  await runCheck("07 Frontend /privacy", async () => {
     await requestRawUrl(buildFrontendUrl("/privacy"), { method: "GET" }, [200]);
   });
 
-  await runCheck("07 Frontend /account-deletion", async () => {
+  await runCheck("08 Frontend /account-deletion", async () => {
     await requestRawUrl(buildFrontendUrl("/account-deletion"), { method: "GET" }, [200]);
   });
 
-  await runCheck("08 CORS web frontend", async () => {
+  await runCheck("09 CORS web frontend", async () => {
     const response = await requestRawUrl(
       `${API_BASE_URL.replace(/\/+$/, "")}/health`,
       { method: "GET", headers: { Origin: frontendOrigin } },
@@ -254,7 +258,7 @@ async function main() {
     assertCorsAllowed(response, frontendOrigin);
   });
 
-  await runCheck("09 CORS Capacitor localhost", async () => {
+  await runCheck("10 CORS Capacitor localhost", async () => {
     const response = await requestRawUrl(
       `${API_BASE_URL.replace(/\/+$/, "")}/health`,
       { method: "GET", headers: { Origin: "capacitor://localhost" } },
@@ -263,7 +267,7 @@ async function main() {
     assertCorsAllowed(response, "capacitor://localhost");
   });
 
-  await runCheck("10 CORS HTTP localhost", async () => {
+  await runCheck("11 CORS HTTP localhost", async () => {
     const response = await requestRawUrl(
       `${API_BASE_URL.replace(/\/+$/, "")}/health`,
       { method: "GET", headers: { Origin: "http://localhost" } },
@@ -272,7 +276,7 @@ async function main() {
     assertCorsAllowed(response, "http://localhost");
   });
 
-  await runCheck("11 CORS Ionic localhost", async () => {
+  await runCheck("12 CORS Ionic localhost", async () => {
     const response = await requestRawUrl(
       `${API_BASE_URL.replace(/\/+$/, "")}/health`,
       { method: "GET", headers: { Origin: "ionic://localhost" } },
@@ -281,7 +285,7 @@ async function main() {
     assertCorsAllowed(response, "ionic://localhost");
   });
 
-  await runCheck("12 CORS HTTPS localhost", async () => {
+  await runCheck("13 CORS HTTPS localhost", async () => {
     const response = await requestRawUrl(
       `${API_BASE_URL.replace(/\/+$/, "")}/health`,
       { method: "GET", headers: { Origin: "https://localhost" } },
@@ -290,13 +294,13 @@ async function main() {
     assertCorsAllowed(response, "https://localhost");
   });
 
-  await runCheck("13 Product search", async () => {
+  await runCheck("14 Product search", async () => {
     const data = await requestJson("/products?search=iphone", { method: "GET" }, [200]);
     assert(data?.success === true, "Product search did not return success true.");
     assert(Array.isArray(data?.products), "Product search did not return a products array.");
   });
 
-  await runCheck("14 Customer login", async () => {
+  await runCheck("15 Customer login", async () => {
     const data = await requestJson(
       "/auth/login",
       { method: "POST", body: { emailOrPhone: CUSTOMER_EMAIL, password: CUSTOMER_PASSWORD } },
@@ -307,7 +311,7 @@ async function main() {
     assert(Boolean(customerToken), "Customer login did not return a token.");
   });
 
-  await runCheck("15 Customer getMe", async () => {
+  await runCheck("16 Customer getMe", async () => {
     const data = await requestJson(
       "/auth/me",
       { method: "GET", headers: authHeaders(customerToken) },
@@ -317,7 +321,7 @@ async function main() {
     assert(emailsMatch(data?.user?.email, CUSTOMER_EMAIL), "Customer getMe returned the wrong email.");
   });
 
-  await runCheck("16 Vendor login", async () => {
+  await runCheck("17 Vendor login", async () => {
     const data = await requestJson(
       "/auth/login",
       { method: "POST", body: { emailOrPhone: VENDOR_EMAIL, password: VENDOR_PASSWORD } },
@@ -328,7 +332,7 @@ async function main() {
     assert(Boolean(vendorToken), "Vendor login did not return a token.");
   });
 
-  await runCheck("17 Vendor getMe", async () => {
+  await runCheck("18 Vendor getMe", async () => {
     const data = await requestJson(
       "/auth/me",
       { method: "GET", headers: authHeaders(vendorToken) },
@@ -338,14 +342,14 @@ async function main() {
     assert(emailsMatch(data?.user?.email, VENDOR_EMAIL), "Vendor getMe returned the wrong email.");
   });
 
-  await runCheck("18 Product list", async () => {
+  await runCheck("19 Product list", async () => {
     const data = await requestJson("/products", { method: "GET" }, [200]);
     assert(data?.success === true, "Product list did not return success true.");
     assert(Array.isArray(data?.products), "Product list did not return a products array.");
     firstProductId = getId(data.products[0]);
   });
 
-  await runCheck("19 Owner vendor views", async () => {
+  await runCheck("20 Owner vendor views", async () => {
     const mine = await requestJson(
       "/products/my-products",
       { method: "GET", headers: authHeaders(vendorToken) },
@@ -378,7 +382,7 @@ async function main() {
     );
   });
 
-  await runCheck("20 Product detail", async () => {
+  await runCheck("21 Product detail", async () => {
     if (!firstProductId) return;
 
     const data = await requestJson(
@@ -389,7 +393,7 @@ async function main() {
     assert(data?.success === true, "Product detail did not return success true.");
   });
 
-  await runCheck("21 Product detail unique guest views", async () => {
+  await runCheck("22 Product detail unique guest views", async () => {
     if (!firstProductId) return;
 
     const viewerId = `prod-smoke-${Date.now()}`;

@@ -103,6 +103,7 @@ test('registers profile and account routes', () => {
 
   expect(screen.getByTestId('route-/profile')).toBeInTheDocument();
   expect(screen.getByTestId('route-/account')).toBeInTheDocument();
+  expect(screen.getByTestId('route-/forgot-password')).toBeInTheDocument();
 });
 
 test('MobileWelcomePage renders native auth choices', () => {

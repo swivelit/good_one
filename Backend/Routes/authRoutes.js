@@ -5,6 +5,8 @@ const {
   registerCustomer,
   registerVendor,
   login,
+  requestPasswordResetOtp,
+  resetPassword,
   getMe,
   updateMe,
   deleteMe,
@@ -47,6 +49,8 @@ router.post(
 );
 
 router.post('/login', login);
+router.post('/forgot-password/send-otp', requestPasswordResetOtp);
+router.post('/forgot-password/reset', resetPassword);
 
 router.get('/me', protect, getMe);
 router.put('/me', protect, updateMe);

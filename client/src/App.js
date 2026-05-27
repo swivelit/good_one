@@ -9,6 +9,7 @@ import Footer from './footer';
 import HomePage from './pages/HomePage';
 import MobileWelcomePage from './pages/MobileWelcomePage';
 import LoginPage from './pages/loginpage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import RegisterCustomer from './pages/RegisterConstomerpage';
 import RegisterVendor from './pages/registervendor';
 import ProductDetail from './pages/productDetail';
@@ -49,7 +50,7 @@ function AppRoutes() {
   const hideNativeAuthChrome =
     isNative &&
     !user &&
-    ["/", "/login", "/register/customer", "/register/vendor"].includes(location.pathname);
+    ["/", "/login", "/forgot-password", "/register/customer", "/register/vendor"].includes(location.pathname);
 
   return (
     <div className={isNative ? `native-app-shell ${user ? "native-with-bottom-nav" : ""}` : undefined}>
@@ -58,6 +59,7 @@ function AppRoutes() {
         <Route path="/" element={<NativeStartRoute />} />
         <Route path="/browse" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/register/customer" element={<RegisterCustomer />} />
         <Route path="/register/vendor" element={<RegisterVendor />} />
         <Route path="/products/:id" element={<ProductDetail />} />

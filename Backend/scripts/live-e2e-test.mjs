@@ -5,6 +5,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "https://good-one-jlcu.onrender
 const OTP_CODE = process.env.OTP_CODE || "111111";
 
 const PASSWORD = "Test@12345";
+const RESET_PASSWORD = "Reset@Test12345";
 const RUN_ID = Date.now().toString();
 let phoneCounter = 0;
 
@@ -342,7 +343,83 @@ async function main() {
       assert(Boolean(state.customerToken), "Customer login did not return a token.");
     });
 
-    await runCheck("13 Customer getMe", async () => {
+    await runCheck("13 Forgot password rejects unregistered email", async () => {
+      const data = await requestJson(
+        "/auth/forgot-password/send-otp",
+        { method: "POST", body: { email: `missing-${RUN_ID}@example.com` } },
+        [404]
+      );
+      assert(data?.success === false, "Unregistered forgot password did not return success false.");
+      assert(
+        data?.message === "This email is not registered",
+        "Unregistered forgot password returned the wrong message."
+      );
+    });
+
+    await runCheck("14 Forgot password sends customer OTP", async () => {
+      const data = await requestJson(
+        "/auth/forgot-password/send-otp",
+        { method: "POST", body: { email: customerEmail } },
+        [200]
+      );
+      assert(data?.success === true, "Forgot password OTP did not return success true.");
+      assert(data?.testOtpEnabled === true, "Forgot password OTP did not report testOtpEnabled true.");
+    });
+
+    await runCheck("15 Forgot password rejects wrong OTP", async () => {
+      const data = await requestJson(
+        "/auth/forgot-password/reset",
+        {
+          method: "POST",
+          body: {
+            email: customerEmail,
+            otp: "000000",
+            newPassword: RESET_PASSWORD,
+          },
+        },
+        [400]
+      );
+      assert(data?.success === false, "Wrong password reset OTP did not return success false.");
+      assert(data?.message === "Invalid or expired OTP", "Wrong password reset OTP returned the wrong message.");
+    });
+
+    await runCheck("16 Forgot password resets customer password", async () => {
+      const data = await requestJson(
+        "/auth/forgot-password/reset",
+        {
+          method: "POST",
+          body: {
+            email: customerEmail,
+            otp: OTP_CODE,
+            newPassword: RESET_PASSWORD,
+          },
+        },
+        [200]
+      );
+      assert(data?.success === true, "Password reset did not return success true.");
+    });
+
+    await runCheck("17 Customer old password fails after reset", async () => {
+      const data = await requestJson(
+        "/auth/login",
+        { method: "POST", body: { emailOrPhone: customerEmail, password: PASSWORD } },
+        [401]
+      );
+      assert(data?.success === false, "Old customer password still worked after reset.");
+    });
+
+    await runCheck("18 Customer login works with reset password", async () => {
+      const data = await requestJson(
+        "/auth/login",
+        { method: "POST", body: { emailOrPhone: customerEmail, password: RESET_PASSWORD } },
+        [200]
+      );
+      state.customerToken = data?.token;
+      assert(data?.success === true, "Reset customer password did not log in successfully.");
+      assert(Boolean(state.customerToken), "Reset customer login did not return a token.");
+    });
+
+    await runCheck("19 Customer getMe", async () => {
       const data = await requestJson(
         "/auth/me",
         { method: "GET", headers: authHeaders(state.customerToken) },
@@ -352,7 +429,7 @@ async function main() {
       assert(data?.user?.email === customerEmail, "Customer getMe returned the wrong email.");
     });
 
-    await runCheck("14 Customer profile update", async () => {
+    await runCheck("20 Customer profile update", async () => {
       const updatedName = `Updated Customer ${RUN_ID}`;
       const updatedPhone = makeUniquePhone("702");
       const data = await requestJson(
@@ -370,7 +447,7 @@ async function main() {
       assert(data?.user?.role === "customer", "Customer profile update changed the user role.");
     });
 
-    await runCheck("15 Vendor send OTP", async () => {
+    await runCheck("21 Vendor send OTP", async () => {
       const data = await requestJson(
         "/sendOtp",
         { method: "POST", body: { email: vendorEmail } },
@@ -380,7 +457,7 @@ async function main() {
       assert(data?.testOtpEnabled === true, "Vendor send OTP did not report testOtpEnabled true.");
     });
 
-    await runCheck("16 Vendor register", async () => {
+    await runCheck("22 Vendor register", async () => {
       const form = new FormData();
       form.append("name", `E2E Vendor ${RUN_ID}`);
       form.append("email", vendorEmail);
@@ -407,7 +484,7 @@ async function main() {
       assert(Boolean(data?.vendor), "Vendor register did not return a vendor object.");
     });
 
-    await runCheck("17 Vendor login", async () => {
+    await runCheck("23 Vendor login", async () => {
       const data = await requestJson(
         "/auth/login",
         { method: "POST", body: { emailOrPhone: vendorEmail, password: PASSWORD } },
@@ -420,7 +497,7 @@ async function main() {
       assert(Boolean(data?.vendorProfile), "Vendor login did not return vendorProfile.");
     });
 
-    await runCheck("18 Vendor create product", async () => {
+    await runCheck("24 Vendor create product", async () => {
       const form = new FormData();
       form.append("title", `E2E Product ${RUN_ID}`);
       form.append("description", "Automated live E2E product listing");
@@ -443,7 +520,7 @@ async function main() {
       assert(Boolean(productId), "Product create did not return a product id.");
     });
 
-    await runCheck("19 Vendor self views do not increment", async () => {
+    await runCheck("25 Vendor self views do not increment", async () => {
       const first = await requestJson(
         `/products/${encodeURIComponent(productId)}`,
         { method: "GET", headers: authHeaders(state.vendorToken) },
@@ -464,7 +541,7 @@ async function main() {
       }
     });
 
-    await runCheck("20 Product list/detail", async () => {
+    await runCheck("26 Product list/detail", async () => {
       const list = await requestJson("/products", { method: "GET" }, [200]);
       assert(list?.success === true, "Product list did not return success true.");
       assert(Array.isArray(list?.products), "Product list did not return a products array.");
@@ -475,7 +552,7 @@ async function main() {
       assert(getId(detail?.product) === productId, "Product detail returned the wrong product id.");
     });
 
-    await runCheck("21 Product search", async () => {
+    await runCheck("27 Product search", async () => {
       const data = await requestJson(`/products?search=${encodeURIComponent(RUN_ID)}`, { method: "GET" }, [200]);
       assert(data?.success === true, "Product search did not return success true.");
       assert(Array.isArray(data?.products), "Product search did not return a products array.");
@@ -485,7 +562,7 @@ async function main() {
       );
     });
 
-    await runCheck("22 Product unique guest views", async () => {
+    await runCheck("28 Product unique guest views", async () => {
       const viewerId = `live-e2e-${RUN_ID}`;
       const first = await requestJson(
         `/products/${encodeURIComponent(productId)}`,
@@ -517,12 +594,12 @@ async function main() {
       );
     });
 
-    await runCheck("23 Uploaded image loads", async () => {
+    await runCheck("29 Uploaded image loads", async () => {
       assert(Boolean(productImage), "Product did not include an uploaded image filename.");
       await requestRawUrl(uploadedImageUrl(productImage), { method: "GET" }, [200]);
     });
 
-    await runCheck("24 Customer creates conversation", async () => {
+    await runCheck("30 Customer creates conversation", async () => {
       const data = await requestJson(
         "/chat/conversation",
         {
@@ -537,7 +614,7 @@ async function main() {
       assert(Boolean(conversationId), "Create conversation did not return a conversation id.");
     });
 
-    await runCheck("25 Messaging", async () => {
+    await runCheck("31 Messaging", async () => {
       const customerMessage = await requestJson(
         `/chat/${encodeURIComponent(conversationId)}/messages`,
         {
@@ -570,7 +647,7 @@ async function main() {
       assert(messages.messages.length >= 2, "Get messages returned fewer than 2 messages.");
     });
 
-    await runCheck("26 Report listing", async () => {
+    await runCheck("32 Report listing", async () => {
       const data = await requestJson(
         "/reports",
         {
@@ -588,7 +665,7 @@ async function main() {
       assert(data?.success === true, "Listing report did not return success true.");
     });
 
-    await runCheck("27 Report conversation", async () => {
+    await runCheck("33 Report conversation", async () => {
       const data = await requestJson(
         "/reports",
         {
@@ -606,7 +683,7 @@ async function main() {
       assert(data?.success === true, "Conversation report did not return success true.");
     });
 
-    await runCheck("28 Block user", async () => {
+    await runCheck("34 Block user", async () => {
       const data = await requestJson(
         "/blocks",
         {
@@ -622,7 +699,7 @@ async function main() {
       assert(data?.success === true, "Block user did not return success true.");
     });
 
-    await runCheck("29 Block prevents further message", async () => {
+    await runCheck("35 Block prevents further message", async () => {
       const data = await requestJson(
         `/chat/${encodeURIComponent(conversationId)}/messages`,
         {
@@ -635,7 +712,7 @@ async function main() {
       assert(data?.success === false, "Blocked message did not return success false.");
     });
 
-    await runCheck("30 Account deletion cleanup", async () => {
+    await runCheck("36 Account deletion cleanup", async () => {
       const customerDelete = await requestJson(
         "/auth/me",
         { method: "DELETE", headers: authHeaders(state.customerToken) },
@@ -653,10 +730,10 @@ async function main() {
       state.vendorDeleted = true;
     });
 
-    await runCheck("31 Verify deleted login fails", async () => {
+    await runCheck("37 Verify deleted login fails", async () => {
       const customerLogin = await requestJson(
         "/auth/login",
-        { method: "POST", body: { emailOrPhone: customerEmail, password: PASSWORD } },
+        { method: "POST", body: { emailOrPhone: customerEmail, password: RESET_PASSWORD } },
         [401]
       );
       assert(customerLogin?.success === false, "Deleted customer login did not return success false.");
