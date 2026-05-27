@@ -95,13 +95,18 @@ XCODEBUILD_ARGS=(
   -configuration "$IOS_CONFIGURATION"
   -destination "$IOS_DESTINATION"
   -archivePath "$ARCHIVE_PATH"
+  ENABLE_USER_SCRIPT_SANDBOXING=NO
 )
 
 if [ -n "$IOS_TEAM_ID" ]; then
   XCODEBUILD_ARGS+=(DEVELOPMENT_TEAM="$IOS_TEAM_ID" CODE_SIGN_STYLE=Automatic)
 else
-  echo "WARNING: IOS_TEAM_ID is not set. If Xcode signing is not already configured, archive will fail."
-  echo "Example: IOS_TEAM_ID=ABCDE12345 ./scripts/build-ios-archive.sh"
+  echo "WARNING: IOS_TEAM_ID is not set."
+  echo "Signed iOS archive builds require an Apple signing team."
+  echo "App Store and TestFlight distribution require Apple Developer Program membership."
+  echo "If local Xcode signing is already configured, this archive may still work."
+  echo "For no-payment local iOS verification, run: ./scripts/build-ios-simulator.sh"
+  echo "Example signed archive: IOS_TEAM_ID=YOUR_TEAM_ID ./scripts/build-ios-archive.sh"
 fi
 
 if [ -n "$IOS_BUNDLE_ID" ]; then

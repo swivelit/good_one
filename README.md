@@ -27,7 +27,7 @@ React environment variables are public. `client/src/config.js` already falls bac
 
 ## Capacitor mobile apps
 
-Android already exists at `client/android` and Capacitor Android 7 requires JDK 21 for Gradle builds. If your terminal still uses Java 17, switch `JAVA_HOME` to a JDK 21 install before running Gradle. iOS is generated when needed and requires a Mac, an Apple Developer account, and Xcode 26 or newer. Before iOS sync/archive, make sure `xcode-select` points to the full Xcode app and the Xcode license has been accepted.
+Android already exists at `client/android` and Capacitor Android 7 requires JDK 21 for Gradle builds. If your terminal still uses Java 17, switch `JAVA_HOME` to a JDK 21 install before running Gradle. iOS is generated when needed. Simulator builds require macOS, Xcode 26 or newer, and CocoaPods, but do not require Apple Developer Program payment or signing. Signed iOS device/archive builds require Apple signing; TestFlight and App Store distribution require Apple Developer Program membership. Before iOS sync/build/archive, make sure `xcode-select` points to the full Xcode app and the Xcode license has been accepted.
 
 The current Capacitor app id and Android package are `com.goodone.marketplace`. Finalize this before the first Play Store or App Store upload. If it needs to change, update `client/capacitor.config.json`, `client/android/app/build.gradle`, `client/android/app/src/main/res/values/strings.xml`, and the Xcode target Bundle Identifier.
 
@@ -91,6 +91,21 @@ Android is currently `versionCode 1` and `versionName 1.0`. Every future Play St
 
 iOS is currently `MARKETING_VERSION 1.0` and `CURRENT_PROJECT_VERSION 1`. Every future App Store upload must increment the iOS build number.
 
+For local iOS build verification without Apple Developer Program payment or signing, use the simulator build:
+
+```sh
+cd client
+npm run build:ios:simulator
+```
+
+For signed release, TestFlight, or App Store archive builds, provide your own Apple Team ID from the repository root:
+
+```sh
+IOS_TEAM_ID=YOUR_TEAM_ID REACT_APP_USE_ADMOB_TEST_ADS=false ./scripts/build-ios-archive.sh
+```
+
+Do not commit Apple Team IDs, certificates, provisioning profiles, private keys, or Apple accounts. Apple signing and Developer Program payment requirements are Apple platform requirements, not GoodOne code issues. A free Apple Account with Xcode Personal Team can be used for limited personal device testing, but not for TestFlight or App Store distribution.
+
 If this Mac is still pointed at Command Line Tools, run:
 
 ```sh
@@ -134,13 +149,11 @@ iOS:
 
 ```sh
 cd client
-npx cap add ios
-npm run build
-npx cap sync ios
-npx cap open ios
+npm run build:ios:simulator
 ```
 
-- In Xcode, use `Product > Archive > Distribute App`.
+- Local simulator verification uses no Apple Developer Program payment and no signing.
+- For TestFlight/App Store, run `IOS_TEAM_ID=YOUR_TEAM_ID REACT_APP_USE_ADMOB_TEST_ADS=false ./scripts/build-ios-archive.sh` from the repository root, then distribute the signed archive from Xcode.
 
 Store submission checklist:
 
