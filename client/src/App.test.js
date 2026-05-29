@@ -157,12 +157,12 @@ test('AppVideoManager stays hidden on web', () => {
   expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
 });
 
-test('AppVideoManager renders splash only in native Capacitor mode', () => {
+test('AppVideoManager does not render startup splash in native Capacitor mode', () => {
   Capacitor.isNativePlatform.mockReturnValue(true);
 
   const { container } = render(<AppVideoManager />);
 
-  expect(container.querySelector('.app-video-splash')).toBeInTheDocument();
+  expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
 });
 
 test('AppVideoManager adds the native body class in native Capacitor mode', () => {
@@ -198,7 +198,6 @@ test('syncNativeViewportCssVariables writes visualViewport dimensions to CSS var
 
 const POPUP_REPEAT_INTERVAL_MS = 20000;
 const LOCAL_VIDEO_DURATION_MS = 10000;
-const INTRO_TIMEOUT_MS = LOCAL_VIDEO_DURATION_MS;
 const GOOGLE_AD_DURATION_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
 
 const flushPromises = async () => {
@@ -224,7 +223,9 @@ const renderNativeVideoManager = () => {
 const renderNativeAdMobPhase = async () => {
   const view = renderNativeVideoManager();
 
-  await advanceTimers(INTRO_TIMEOUT_MS);
+  await act(async () => {
+    await flushPromises();
+  });
   return view;
 };
 
@@ -284,7 +285,7 @@ const showBannerWithIsolatedAdMobEnv = async (envValue) => {
   return isolatedAdMob;
 };
 
-test('AppVideoManager shows AdMob after the 10-second launch video', async () => {
+test('AppVideoManager starts AdMob immediately without rendering startup splash', async () => {
   const { container } = await renderNativeAdMobPhase();
 
   expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
@@ -416,27 +417,36 @@ test('AppVideoManager clears timers and removes banner on unmount', async () => 
   expect(AdMob.removeBanner).toHaveBeenCalled();
 });
 
-test('AppVideoManager replays the 10-second splash video when app becomes visible again', async () => {
+test('AppVideoManager restarts AdMob without replaying startup splash when app becomes visible again', async () => {
   const { container } = await renderNativeAdMobPhase();
 
   expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
   expect(AdMob.showBanner).toHaveBeenCalled();
+  const showBannerCount = AdMob.showBanner.mock.calls.length;
 
   Object.defineProperty(document, 'visibilityState', {
     configurable: true,
     get: () => 'hidden',
   });
   fireEvent(document, new Event('visibilitychange'));
+  await act(async () => {
+    await flushPromises();
+  });
 
   expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
+  expect(AdMob.removeBanner).toHaveBeenCalled();
 
   Object.defineProperty(document, 'visibilityState', {
     configurable: true,
     get: () => 'visible',
   });
   fireEvent(document, new Event('visibilitychange'));
+  await act(async () => {
+    await flushPromises();
+  });
 
-  expect(container.querySelector('.app-video-splash')).toBeInTheDocument();
+  expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
+  expect(AdMob.showBanner).toHaveBeenCalledTimes(showBannerCount + 1);
 });
 
 test('AppVideoManager expands floating video on tap and collapses from backdrop', async () => {

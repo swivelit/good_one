@@ -9,7 +9,6 @@ import {
 
 const POPUP_REPEAT_INTERVAL_MS = 20000;
 const LOCAL_VIDEO_DURATION_MS = 10000;
-const INTRO_TIMEOUT_MS = LOCAL_VIDEO_DURATION_MS;
 const GOOGLE_AD_DURATION_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
 const POSITION_KEY = "goodone_floating_video_position";
 const EDGE_GAP = 12;
@@ -117,12 +116,10 @@ const getNativeBottomChromeReservedHeight = () => {
 
 export default function AppVideoManager() {
   const isNative = Capacitor.isNativePlatform();
-  const [showSplash, setShowSplash] = useState(isNative);
   const [showFloating, setShowFloating] = useState(false);
   const [floatingPosition, setFloatingPosition] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const splashTimerRef = useRef(null);
   const cycleTimerRef = useRef(null);
   const showAdMobPhaseRef = useRef(() => {});
   const showLocalVideoPhaseRef = useRef(() => {});
@@ -193,13 +190,6 @@ export default function AppVideoManager() {
     return getDefaultPosition();
   }, [clampPosition, getDefaultPosition]);
 
-  const clearSplashTimer = useCallback(() => {
-    if (splashTimerRef.current) {
-      clearTimeout(splashTimerRef.current);
-      splashTimerRef.current = null;
-    }
-  }, []);
-
   const clearCycleTimer = useCallback(() => {
     if (cycleTimerRef.current) {
       clearTimeout(cycleTimerRef.current);
@@ -246,18 +236,6 @@ export default function AppVideoManager() {
     setIsDragging(false);
     dragRef.current = null;
   }, [muteFloatingAudio]);
-
-  const hideSplash = useCallback(() => {
-    clearSplashTimer();
-    setShowSplash(false);
-  }, [clearSplashTimer]);
-
-  const scheduleSplashTimeout = useCallback(() => {
-    clearSplashTimer();
-    if (!isNative || !showSplash || document.visibilityState !== "visible") return;
-
-    splashTimerRef.current = setTimeout(hideSplash, INTRO_TIMEOUT_MS);
-  }, [clearSplashTimer, hideSplash, isNative, showSplash]);
 
   const ensureBottomAdMobBanner = useCallback(() => {
     const status = getAdMobBannerStatus();
@@ -317,16 +295,12 @@ export default function AppVideoManager() {
     showLocalVideoPhaseRef.current = showLocalVideoPhase;
   }, [showLocalVideoPhase]);
 
-  const stopNativeVideoCycle = useCallback((resetSplash = false) => {
-    clearSplashTimer();
+  const stopNativeVideoCycle = useCallback(() => {
     clearCycleTimers();
     resetFloatingInteraction();
     setShowFloating(false);
-    if (resetSplash) {
-      setShowSplash(false);
-    }
     removeBottomAdMobBanner();
-  }, [clearCycleTimers, clearSplashTimer, removeBottomAdMobBanner, resetFloatingInteraction]);
+  }, [clearCycleTimers, removeBottomAdMobBanner, resetFloatingInteraction]);
 
   const handlePointerDown = useCallback((event) => {
     if (isExpanded || !floatingPosition || event.button > 0) return;
@@ -456,28 +430,22 @@ export default function AppVideoManager() {
   useEffect(() => {
     if (!isNative) return undefined;
 
-    scheduleSplashTimeout();
-    return clearSplashTimer;
-  }, [clearSplashTimer, isNative, scheduleSplashTimeout]);
-
-  useEffect(() => {
-    if (!isNative || showSplash) return undefined;
     if (document.visibilityState !== "visible") return undefined;
 
     showAdMobPhaseRef.current();
     return clearCycleTimers;
-  }, [clearCycleTimers, isNative, showSplash]);
+  }, [clearCycleTimers, isNative]);
 
   useEffect(() => {
     if (!isNative) return undefined;
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        stopNativeVideoCycle(true);
+        stopNativeVideoCycle();
         return;
       }
 
-      setShowSplash(true);
+      showAdMobPhaseRef.current();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -493,12 +461,11 @@ export default function AppVideoManager() {
     if (!isNative) return undefined;
 
     return () => {
-      clearSplashTimer();
       clearCycleTimers();
       setShowFloating(false);
       removeBottomAdMobBanner();
     };
-  }, [clearCycleTimers, clearSplashTimer, isNative, removeBottomAdMobBanner]);
+  }, [clearCycleTimers, isNative, removeBottomAdMobBanner]);
 
   useEffect(() => {
     if (!isNative) return undefined;
@@ -528,20 +495,7 @@ export default function AppVideoManager() {
 
   return (
     <>
-      {showSplash && (
-        <div className="app-video-splash" role="presentation">
-          <video
-            src={VIDEO_SRC}
-            autoPlay
-            playsInline
-            preload="auto"
-            onEnded={hideSplash}
-            onError={hideSplash}
-          />
-        </div>
-      )}
-
-      {!showSplash && showFloating && (
+      {showFloating && (
         <>
           {isExpanded && (
             <div

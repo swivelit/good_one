@@ -818,26 +818,6 @@ body.goodone-admob-banner-active .native-bottom-nav {
   box-shadow: 0 10px 28px rgba(255, 107, 53, 0.28);
 }
 
-.app-video-splash {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: calc(1rem + var(--goodone-safe-area-top)) 1rem calc(1rem + var(--goodone-safe-area-bottom));
-  background:
-    radial-gradient(circle at 50% 12%, rgba(255, 107, 53, 0.25), transparent 34%),
-    linear-gradient(160deg, #050505 0%, #171717 48%, #2C3E50 100%);
-}
-
-.app-video-splash video {
-  width: min(100%, 520px);
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: 18px;
-}
-
 .floating-video-widget {
   position: fixed;
   left: auto;
