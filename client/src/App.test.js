@@ -6,12 +6,16 @@ import { AdMob } from '@capacitor-community/admob';
 import App from './App';
 import AppVideoManager, {
   LOCAL_FLOATING_VIDEO_STORAGE_KEY,
+  isLocalFloatingVideoAdEnabled,
+  isLocalFloatingVideoRouteAllowed,
   syncNativeViewportCssVariables,
 } from './components/AppVideoManager';
 import MobileWelcomePage from './pages/MobileWelcomePage';
 
 const mockAdMobListeners = {};
+let mockRouterPathname = '/';
 const androidResDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res');
+const originalLocalVideoEnv = process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD;
 
 const walkFiles = (directory) => (
   fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -94,14 +98,24 @@ jest.mock('react-router-dom', () => {
       </a>
     ),
     useNavigate: () => jest.fn(),
-    useLocation: () => ({ pathname: '/', search: '', hash: '', state: null }),
+    useLocation: () => ({ pathname: mockRouterPathname, search: '', hash: '', state: null }),
     useParams: () => ({}),
     useSearchParams: () => [new URLSearchParams(), jest.fn()],
   };
 }, { virtual: true });
 
+const restoreLocalVideoEnv = () => {
+  if (originalLocalVideoEnv === undefined) {
+    delete process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD;
+  } else {
+    process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD = originalLocalVideoEnv;
+  }
+};
+
 beforeEach(() => {
+  delete process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD;
   jest.clearAllMocks();
+  mockRouterPathname = '/';
   document.body.className = '';
   document.documentElement.removeAttribute('style');
   jest.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve());
@@ -116,6 +130,10 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers();
+});
+
+afterAll(() => {
+  restoreLocalVideoEnv();
 });
 
 test('renders GoodOne app shell', () => {
@@ -175,11 +193,28 @@ test('Android night resources do not include splash PNGs', () => {
 
 test('AppVideoManager stays hidden on web', () => {
   Capacitor.isNativePlatform.mockReturnValue(false);
+  localStorage.setItem(LOCAL_FLOATING_VIDEO_STORAGE_KEY, 'true');
 
   const { container } = render(<AppVideoManager />);
 
   expect(container.querySelector('.app-video-splash')).not.toBeInTheDocument();
   expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+});
+
+test('local floating video is enabled by default on native Android', () => {
+  expect(isLocalFloatingVideoAdEnabled({
+    isNative: true,
+    platform: 'android',
+  })).toBe(true);
+});
+
+test('local floating video route policy blocks sensitive routes', () => {
+  expect(isLocalFloatingVideoRouteAllowed('/browse')).toBe(true);
+  expect(isLocalFloatingVideoRouteAllowed('/login')).toBe(false);
+  expect(isLocalFloatingVideoRouteAllowed('/register/customer')).toBe(false);
+  expect(isLocalFloatingVideoRouteAllowed('/forgot-password')).toBe(false);
+  expect(isLocalFloatingVideoRouteAllowed('/chat/abc')).toBe(false);
+  expect(isLocalFloatingVideoRouteAllowed('/dashboard/add-product')).toBe(false);
 });
 
 test('AppVideoManager does not render startup splash in native Capacitor mode', () => {
@@ -257,8 +292,8 @@ const renderNativeAdMobPhase = async () => {
   return view;
 };
 
-const renderNativeLocalVideoPhase = async () => {
-  const view = renderNativeVideoManager({ enableLocalVideo: true });
+const renderNativeLocalVideoPhase = async (options = {}) => {
+  const view = renderNativeVideoManager(options);
 
   await act(async () => {
     await flushPromises();
@@ -406,7 +441,8 @@ test('AppVideoManager updates the native bottom nav height CSS variable when nav
   rectSpy.mockRestore();
 });
 
-test('AppVideoManager keeps local popup video hidden by default while keeping the bottom banner', async () => {
+test('AppVideoManager keeps local popup video hidden when disabled by env while keeping the bottom banner', async () => {
+  process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD = 'false';
   const { container } = await renderNativeAdMobPhase();
 
   await advanceTimers(BANNER_ONLY_PHASE_MS + 1);
@@ -415,12 +451,42 @@ test('AppVideoManager keeps local popup video hidden by default while keeping th
   expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
 });
 
-test('AppVideoManager shows opt-in local popup video after the banner-only phase while keeping the bottom banner', async () => {
+test('AppVideoManager shows local popup video by default on native Android while keeping the bottom banner', async () => {
   const { container } = await renderNativeLocalVideoPhase();
 
   expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
-  expect(screen.queryByLabelText(/close video/i)).not.toBeInTheDocument();
+  expect(screen.getByLabelText(/close local video promo/i)).toBeInTheDocument();
   expect(AdMob.removeBanner).not.toHaveBeenCalled();
+  expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
+});
+
+test('AppVideoManager allows localStorage to force enable local popup video when env disables it', async () => {
+  process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD = 'false';
+  localStorage.setItem(LOCAL_FLOATING_VIDEO_STORAGE_KEY, 'true');
+
+  const { container } = await renderNativeLocalVideoPhase();
+
+  expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
+  expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
+});
+
+test('AppVideoManager allows localStorage to force disable local popup video', async () => {
+  localStorage.setItem(LOCAL_FLOATING_VIDEO_STORAGE_KEY, 'false');
+  const { container } = await renderNativeAdMobPhase();
+
+  await advanceTimers(BANNER_ONLY_PHASE_MS + 1);
+
+  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+  expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
+});
+
+test('AppVideoManager keeps local popup video hidden on sensitive routes', async () => {
+  mockRouterPathname = '/chat/abc';
+  const { container } = await renderNativeAdMobPhase();
+
+  await advanceTimers(BANNER_ONLY_PHASE_MS + 1);
+
+  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
   expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
 });
 
@@ -551,15 +617,17 @@ test('AppVideoManager keeps floating popup muted until the user taps to expand i
   expect(video.muted).toBe(true);
 });
 
-test('AppVideoManager has no close button after expanding floating video', async () => {
+test('AppVideoManager close button dismisses floating video for the current session', async () => {
   const { container } = await renderNativeLocalVideoPhase();
-  const widget = container.querySelector('.floating-video-widget');
 
-  fireEvent.pointerDown(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
-  fireEvent.pointerUp(widget, { pointerId: 1, clientX: 40, clientY: 40, button: 0 });
+  fireEvent.click(screen.getByLabelText(/close local video promo/i));
 
-  expect(screen.queryByLabelText(/close video/i)).not.toBeInTheDocument();
-  expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
+  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+
+  await advanceTimers(POPUP_REPEAT_INTERVAL_MS);
+
+  expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+  expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
 });
 
 test('AppVideoManager drag movement does not expand floating video', async () => {

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import { useLocation } from "react-router-dom";
 import {
   getAdMobBannerStatus,
   removeAdMobBanner,
@@ -22,17 +23,53 @@ const VIEWPORT_WIDTH_CSS_VARIABLE = "--goodone-viewport-width";
 const ADMOB_LAYOUT_EVENT = "goodone:admob-banner-layout-change";
 const NATIVE_SAFE_AREA_EVENT = "goodone:native-safe-area-change";
 const VIDEO_SRC = "/media/goodone-intro.mp4";
+const LOCAL_VIDEO_BLOCKED_ROUTE_PREFIXES = [
+  "/login",
+  "/forgot-password",
+  "/register",
+  "/dashboard/add-product",
+  "/chat",
+];
 
-export const isLocalFloatingVideoAdEnabled = () => {
+export const isLocalFloatingVideoRouteAllowed = (pathname = "") => {
+  const normalizedPath = String(pathname || "");
+  return !LOCAL_VIDEO_BLOCKED_ROUTE_PREFIXES.some((prefix) => (
+    normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`)
+  ));
+};
+
+const getLocalFloatingVideoStorageOverride = () => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const value = window.localStorage?.getItem(LOCAL_FLOATING_VIDEO_STORAGE_KEY);
+    if (value === "true") return true;
+    if (value === "false") return false;
+  } catch {
+    // Storage overrides are optional. The promo should never block app startup.
+  }
+
+  return null;
+};
+
+export const isLocalFloatingVideoAdEnabled = ({
+  isNative = Capacitor.isNativePlatform(),
+  platform = typeof Capacitor.getPlatform === "function" ? Capacitor.getPlatform() : "web",
+} = {}) => {
+  if (!isNative) return false;
+
+  const storageOverride = getLocalFloatingVideoStorageOverride();
+  if (storageOverride !== null) return storageOverride;
+
+  if (process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD === "false") {
+    return false;
+  }
+
   if (process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD === "true") {
     return true;
   }
 
-  try {
-    return window.localStorage?.getItem(LOCAL_FLOATING_VIDEO_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
+  return platform === "android";
 };
 
 const getWindowSize = () => ({
@@ -128,12 +165,16 @@ const getNativeBottomChromeReservedHeight = () => {
 };
 
 export default function AppVideoManager() {
+  const location = useLocation();
   const isNative = Capacitor.isNativePlatform();
-  const isLocalFloatingVideoEnabled = isNative && isLocalFloatingVideoAdEnabled();
+  const platform = typeof Capacitor.getPlatform === "function" ? Capacitor.getPlatform() : "web";
+  const isLocalFloatingVideoEnabled = isLocalFloatingVideoAdEnabled({ isNative, platform });
+  const isLocalVideoRouteAllowed = isLocalFloatingVideoRouteAllowed(location.pathname);
   const [showFloating, setShowFloating] = useState(false);
   const [floatingPosition, setFloatingPosition] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isLocalVideoDismissed, setIsLocalVideoDismissed] = useState(false);
   const cycleTimerRef = useRef(null);
   const showAdMobPhaseRef = useRef(() => {});
   const showLocalVideoPhaseRef = useRef(() => {});
@@ -142,6 +183,11 @@ export default function AppVideoManager() {
   const widgetRef = useRef(null);
   const floatingVideoRef = useRef(null);
   const dragRef = useRef(null);
+  const wasLocalVideoRouteAllowedRef = useRef(isLocalVideoRouteAllowed);
+  const canShowLocalFloatingVideo =
+    isLocalFloatingVideoEnabled &&
+    isLocalVideoRouteAllowed &&
+    !isLocalVideoDismissed;
 
   const getWidgetSize = useCallback(() => {
     const rect = widgetRef.current?.getBoundingClientRect();
@@ -279,7 +325,7 @@ export default function AppVideoManager() {
     setShowFloating(false);
     ensureBottomAdMobBanner();
 
-    if (!isLocalFloatingVideoEnabled) return;
+    if (!canShowLocalFloatingVideo) return;
 
     cycleTimerRef.current = setTimeout(() => {
       cycleTimerRef.current = null;
@@ -287,8 +333,8 @@ export default function AppVideoManager() {
     }, BANNER_ONLY_PHASE_MS);
   }, [
     clearCycleTimer,
+    canShowLocalFloatingVideo,
     ensureBottomAdMobBanner,
-    isLocalFloatingVideoEnabled,
     isNative,
     resetFloatingInteraction,
   ]);
@@ -297,7 +343,7 @@ export default function AppVideoManager() {
     clearCycleTimer();
     if (
       !isNative ||
-      !isLocalFloatingVideoEnabled ||
+      !canShowLocalFloatingVideo ||
       document.visibilityState !== "visible"
     ) return;
 
@@ -314,8 +360,8 @@ export default function AppVideoManager() {
     }, LOCAL_VIDEO_DURATION_MS);
   }, [
     clearCycleTimer,
+    canShowLocalFloatingVideo,
     ensureBottomAdMobBanner,
-    isLocalFloatingVideoEnabled,
     isNative,
     loadPosition,
     resetFloatingInteraction,
@@ -335,6 +381,15 @@ export default function AppVideoManager() {
     setShowFloating(false);
     removeBottomAdMobBanner();
   }, [clearCycleTimers, removeBottomAdMobBanner, resetFloatingInteraction]);
+
+  const handleDismissLocalVideo = useCallback((event) => {
+    event.stopPropagation();
+    clearCycleTimers();
+    setIsLocalVideoDismissed(true);
+    resetFloatingInteraction();
+    setShowFloating(false);
+    ensureBottomAdMobBanner();
+  }, [clearCycleTimers, ensureBottomAdMobBanner, resetFloatingInteraction]);
 
   const handlePointerDown = useCallback((event) => {
     if (isExpanded || !floatingPosition || event.button > 0) return;
@@ -473,6 +528,33 @@ export default function AppVideoManager() {
   useEffect(() => {
     if (!isNative) return undefined;
 
+    const wasAllowed = wasLocalVideoRouteAllowedRef.current;
+    wasLocalVideoRouteAllowedRef.current = isLocalVideoRouteAllowed;
+
+    if (!isLocalVideoRouteAllowed) {
+      clearCycleTimers();
+      resetFloatingInteraction();
+      setShowFloating(false);
+      ensureBottomAdMobBanner();
+      return undefined;
+    }
+
+    if (!wasAllowed && document.visibilityState === "visible") {
+      showAdMobPhaseRef.current();
+    }
+
+    return undefined;
+  }, [
+    clearCycleTimers,
+    ensureBottomAdMobBanner,
+    isLocalVideoRouteAllowed,
+    isNative,
+    resetFloatingInteraction,
+  ]);
+
+  useEffect(() => {
+    if (!isNative) return undefined;
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         stopNativeVideoCycle();
@@ -559,6 +641,15 @@ export default function AppVideoManager() {
               preload="auto"
               muted={!isExpanded}
             />
+            <button
+              type="button"
+              className="floating-video-close"
+              aria-label="Close local video promo"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={handleDismissLocalVideo}
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
           </div>
         </>
       )}

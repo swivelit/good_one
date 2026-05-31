@@ -868,6 +868,30 @@ body.goodone-admob-banner-active .native-bottom-nav {
   object-fit: cover;
 }
 
+.floating-video-close {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  background: rgba(17, 17, 17, 0.72);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.floating-video-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 .admob-debug-panel {
   position: fixed;
   top: calc(12px + var(--goodone-safe-area-top));

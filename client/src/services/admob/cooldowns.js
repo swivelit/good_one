@@ -1,6 +1,8 @@
 export const INTERSTITIAL_COOLDOWN_MS = 3 * 60 * 1000;
 export const INTERSTITIAL_DAILY_CAP = 3;
 export const APP_OPEN_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+export const PRODUCT_DETAIL_INTERSTITIAL_INTERVAL = 2;
+export const PRODUCT_DETAIL_INTERSTITIAL_MIN_INTERVAL = 2;
 
 const INTERSTITIAL_STATE_KEY = "goodone_admob_interstitial_state_v1";
 const APP_OPEN_STATE_KEY = "goodone_admob_app_open_state_v1";
@@ -153,8 +155,20 @@ export const getProductDetailViewCount = () => (
   readNumber(PRODUCT_DETAIL_VIEW_COUNT_KEY, 0)
 );
 
+export const getProductDetailInterstitialInterval = () => {
+  const configuredInterval = Number(process.env.REACT_APP_ADMOB_PRODUCT_DETAIL_INTERSTITIAL_INTERVAL);
+  if (
+    Number.isInteger(configuredInterval) &&
+    configuredInterval >= PRODUCT_DETAIL_INTERSTITIAL_MIN_INTERVAL
+  ) {
+    return configuredInterval;
+  }
+
+  return PRODUCT_DETAIL_INTERSTITIAL_INTERVAL;
+};
+
 export const isProductDetailInterstitialMilestone = (count = getProductDetailViewCount()) => (
-  count > 0 && count % 5 === 0
+  count > 0 && count % getProductDetailInterstitialInterval() === 0
 );
 
 export const markVendorPostSuccessForInterstitial = () => {

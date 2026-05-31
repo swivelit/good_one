@@ -139,11 +139,20 @@ Interstitial support is code-ready but guarded:
 - No interstitial on app launch.
 - No interstitial on app exit.
 - No interstitial on login, registration, product posting, or chat routes.
-- Product-detail return trigger: after every 5th product detail view, when returning to browse.
+- Product-detail return trigger: after every 2nd product detail view, when returning to browse/home.
 - Vendor posting trigger: after successful listing creation when the vendor lands back on dashboard.
 - Cooldown: at least 3 minutes.
 - Daily cap: 3 interstitials per user per day.
+- AdMob may still not show an interstitial when there is no fill or the SDK cannot load one.
 - Failures do not block navigation.
+
+Optional tuning:
+
+```bash
+REACT_APP_ADMOB_PRODUCT_DETAIL_INTERSTITIAL_INTERVAL=2
+```
+
+The default is `2`, the minimum allowed value is `2`, and missing/invalid values fall back to `2`. Do not set this to `1`.
 
 ## Rewarded Policy
 
@@ -167,19 +176,23 @@ The current plugin renders banners as native overlays, not inline React elements
 
 ## Floating Local Video
 
-`client/src/components/AppVideoManager.js` can show a small local GoodOne promo video only when explicitly enabled:
+`client/src/components/AppVideoManager.js` can show a small local GoodOne promo video on native Android builds. This is local GoodOne promo media, not AdMob inventory, and it does not earn AdMob revenue.
+
+Disable it for a build with:
+
+```bash
+REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD=false
+```
+
+Force it locally with:
 
 ```js
 localStorage.setItem("GOODONE_LOCAL_VIDEO_AD", "true")
+localStorage.setItem("GOODONE_LOCAL_VIDEO_AD", "false")
+localStorage.removeItem("GOODONE_LOCAL_VIDEO_AD")
 ```
 
-or:
-
-```bash
-REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD=true
-```
-
-It is disabled by default to avoid confusing it with AdMob revenue or covering active marketplace tasks.
+The localStorage override wins for local QA. The promo stays hidden on web, stays off login/register/forgot-password/chat/add-product routes, keeps the real AdMob bottom banner visible, floats for about 10 seconds, and repeats no more often than every 5 minutes.
 
 ## Mediation Readiness
 

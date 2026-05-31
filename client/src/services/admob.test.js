@@ -10,6 +10,8 @@ import {
   INTERSTITIAL_COOLDOWN_MS,
   INTERSTITIAL_DAILY_CAP,
   INTERSTITIAL_PLACEMENTS,
+  getProductDetailInterstitialInterval,
+  isProductDetailInterstitialMilestone,
   canShowAppOpenAd,
   canShowInterstitialAd,
   recordAppOpenShown,
@@ -56,6 +58,7 @@ const ENV_KEYS = [
   'REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID',
   'REACT_APP_ADMOB_ANDROID_REWARDED_ID',
   'REACT_APP_ADMOB_ANDROID_APP_OPEN_ID',
+  'REACT_APP_ADMOB_PRODUCT_DETAIL_INTERSTITIAL_INTERVAL',
   'REACT_APP_ADMOB_TEST_DEVICE_IDS',
 ];
 
@@ -131,6 +134,28 @@ test('browser/web platform skips banner without crashing', async () => {
   await expect(showAdMobBanner()).resolves.toBe(false);
 });
 
+test('product-detail interstitial milestone triggers every two detail views by default', () => {
+  delete process.env.REACT_APP_ADMOB_PRODUCT_DETAIL_INTERSTITIAL_INTERVAL;
+
+  expect(getProductDetailInterstitialInterval()).toBe(2);
+  expect(isProductDetailInterstitialMilestone(1)).toBe(false);
+  expect(isProductDetailInterstitialMilestone(2)).toBe(true);
+  expect(isProductDetailInterstitialMilestone(4)).toBe(true);
+});
+
+test('product-detail interstitial env interval enforces a minimum of two', () => {
+  process.env.REACT_APP_ADMOB_PRODUCT_DETAIL_INTERSTITIAL_INTERVAL = '1';
+  expect(getProductDetailInterstitialInterval()).toBe(2);
+
+  process.env.REACT_APP_ADMOB_PRODUCT_DETAIL_INTERSTITIAL_INTERVAL = 'invalid';
+  expect(getProductDetailInterstitialInterval()).toBe(2);
+
+  process.env.REACT_APP_ADMOB_PRODUCT_DETAIL_INTERSTITIAL_INTERVAL = '3';
+  expect(getProductDetailInterstitialInterval()).toBe(3);
+  expect(isProductDetailInterstitialMilestone(2)).toBe(false);
+  expect(isProductDetailInterstitialMilestone(3)).toBe(true);
+});
+
 test('interstitial cooldown blocks repeat shows until the minimum interval passes', () => {
   const now = Date.UTC(2026, 0, 2, 10, 0, 0);
 
@@ -187,8 +212,8 @@ test('app-open cooldown blocks resume ads for four hours', () => {
   })).toMatchObject({ allowed: true });
 });
 
-test('interstitial policy blocks login, register, chat, product posting, and app launch', () => {
-  ['/login', '/register/customer', '/chat/abc', '/dashboard/add-product'].forEach((currentPath) => {
+test('interstitial policy blocks login, register, forgot password, chat, product posting, and app launch', () => {
+  ['/login', '/register', '/register/customer', '/forgot-password', '/chat/abc', '/dashboard/add-product'].forEach((currentPath) => {
     expect(canShowInterstitialAd({
       currentPath,
       placement: INTERSTITIAL_PLACEMENTS.PRODUCT_DETAIL_RETURN,
