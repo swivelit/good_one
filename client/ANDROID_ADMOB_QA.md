@@ -34,7 +34,7 @@ Google demo Android units used by code:
 
 Never click your own live ads. Use demo ads, test devices, and AdMob diagnostics instead.
 
-## Production Env Vars
+## Production Release Env File
 
 Release/prod mode only uses production ad units when:
 
@@ -42,16 +42,30 @@ Release/prod mode only uses production ad units when:
 REACT_APP_USE_ADMOB_TEST_ADS=false
 ```
 
-Set these before `npm run build` for release builds:
+The release build script loads production ad unit IDs from a private local file:
 
 ```bash
-export REACT_APP_ADMOB_ANDROID_BANNER_ID="ca-app-pub-.../..."
-export REACT_APP_ADMOB_ANDROID_APP_OPEN_ID="ca-app-pub-.../..."
-export REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID="ca-app-pub-.../..."
-export REACT_APP_ADMOB_ANDROID_REWARDED_ID="ca-app-pub-.../..."
+cp client/.env.admob.release.example client/.env.admob.release.local
 ```
 
-If a production ID is missing, that ad format is skipped instead of crashing. App-open is still skipped with the current plugin because there is no app-open API to call.
+Edit `client/.env.admob.release.local`:
+
+```bash
+REACT_APP_ADMOB_ANDROID_BANNER_ID=ca-app-pub-.../...
+REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID=ca-app-pub-.../...
+# Optional only if implemented:
+# REACT_APP_ADMOB_ANDROID_REWARDED_ID=
+# REACT_APP_ADMOB_ANDROID_APP_OPEN_ID=
+```
+
+`client/.env.admob.release.local` is gitignored. Do not commit real production ad unit IDs.
+
+Required release IDs:
+
+- `REACT_APP_ADMOB_ANDROID_BANNER_ID`
+- `REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID` while interstitial support is enabled in `client/src/services/admob.js`
+
+Rewarded and app-open IDs are optional today. App-open is still skipped with the current plugin because there is no app-open API to call.
 
 ## Test Devices
 
@@ -76,7 +90,7 @@ To find and register a test device:
 3. Use the test-device ID shown by Google Mobile Ads logs.
 4. Add the device in AdMob Console under test devices.
 
-Debug builds should not require live ads for QA.
+Debug builds use Google demo ad units and should not require live ads or production ad unit IDs for QA.
 
 ## Debug Panel
 
@@ -200,9 +214,20 @@ These are not solved in React/Capacitor code:
 From repo root:
 
 ```bash
-export REACT_APP_USE_ADMOB_TEST_ADS=false
-export REACT_APP_ADMOB_ANDROID_BANNER_ID="ca-app-pub-.../..."
 ./scripts/build-android_release-apk.sh
 ```
 
-The script warns for missing production ad unit env vars. Warnings mean that format will be skipped in the release bundle.
+The script loads `client/.env.admob.release.local`, then forces:
+
+```bash
+REACT_APP_USE_ADMOB_TEST_ADS=false
+```
+
+Confirm the banner and interstitial IDs are loaded by checking the script output. It prints masked values only, for example:
+
+```text
+REACT_APP_ADMOB_ANDROID_BANNER_ID=ca-app-pub-****1234/****5678
+REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID=ca-app-pub-****1234/****9012
+```
+
+The release script fails before building if required production IDs are missing. Do not upload this AAB if required production AdMob IDs are missing. Never click your own live ads; use debug builds, test devices, and AdMob logs for QA.

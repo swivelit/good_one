@@ -42,7 +42,7 @@
     "assets:generate:android": "npm run assets:prepare && capacitor-assets generate --android",
     "assets:generate:ios": "npm run assets:prepare && capacitor-assets generate --ios",
     "build:android:debug": "REACT_APP_USE_ADMOB_TEST_ADS=true npm run build && cap sync android && cd android && ./gradlew assembleDebug",
-    "build:android:release": "REACT_APP_USE_ADMOB_TEST_ADS=false npm run build && cap sync android && cd android && ./gradlew bundleRelease",
+    "build:android:release": "bash ../scripts/build-android_release-apk.sh",
     "verify:android:release": "cd android && ./gradlew bundleRelease && jarsigner -verify -certs app/build/outputs/bundle/release/app-release.aab",
     "install:android:debug": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
     "logs:android:admob": "adb logcat -v time | grep -iE \"AdMob|MobileAds|Ads|bannerAd|GoogleMobileAds|GoodOne|Capacitor\"",

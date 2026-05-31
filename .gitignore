@@ -9,4 +9,6 @@ dist/
 !.env.example
 !**/.env.example
 !client/.env.production.example
+!client/.env.admob.release.example
+client/.env.admob.release.local
 client/android/key.properties

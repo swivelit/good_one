@@ -9,6 +9,8 @@ ANDROID_DIR="$CLIENT_DIR/android"
 OUTPUT_DIR="$ROOT_DIR/dist"
 
 KEY_PROPERTIES="$ANDROID_DIR/key.properties"
+ADMOB_RELEASE_ENV_FILE="$CLIENT_DIR/.env.admob.release.local"
+ADMOB_SERVICE_FILE="$CLIENT_DIR/src/services/admob.js"
 
 AAB_SOURCE="$ANDROID_DIR/app/build/outputs/bundle/release/app-release.aab"
 APK_SOURCE="$ANDROID_DIR/app/build/outputs/apk/release/app-release.apk"
@@ -17,6 +19,50 @@ AAB_TARGET="$OUTPUT_DIR/goodone-release.aab"
 APK_TARGET="$OUTPUT_DIR/goodone-release.apk"
 
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org/}"
+
+mask_admob_id() {
+  local ad_id="${1:-}"
+
+  if [ -z "$ad_id" ]; then
+    echo "missing"
+    return
+  fi
+
+  local prefix="${ad_id%%/*}"
+  local unit="${ad_id#*/}"
+
+  if [ "$prefix" = "$ad_id" ] || [ -z "$unit" ]; then
+    echo "configured"
+    return
+  fi
+
+  local prefix_tail="${prefix: -4}"
+  local unit_tail="${unit: -4}"
+  echo "ca-app-pub-****${prefix_tail}/****${unit_tail}"
+}
+
+is_interstitial_admob_enabled() {
+  [ -f "$ADMOB_SERVICE_FILE" ] && grep -q "export const showAdMobInterstitial" "$ADMOB_SERVICE_FILE"
+}
+
+require_admob_release_id() {
+  local env_name="$1"
+  local label="$2"
+  local env_value="${!env_name:-}"
+
+  if [ -z "$env_value" ]; then
+    cat <<EOF
+ERROR: Missing required production AdMob ID: $env_name ($label).
+
+Create or update:
+$ADMOB_RELEASE_ENV_FILE
+
+Use this template:
+$CLIENT_DIR/.env.admob.release.example
+EOF
+    exit 1
+  fi
+}
 
 cat <<'BANNER'
 ========================================
@@ -109,23 +155,38 @@ else
 fi
 
 echo ""
-echo "Installing frontend dependencies..."
+echo "Loading release AdMob environment..."
 cd "$CLIENT_DIR"
+if [ -f "$ADMOB_RELEASE_ENV_FILE" ]; then
+  echo "Loading $ADMOB_RELEASE_ENV_FILE"
+  set -a
+  # shellcheck source=/dev/null
+  . "$ADMOB_RELEASE_ENV_FILE"
+  set +a
+else
+  echo "WARNING: $ADMOB_RELEASE_ENV_FILE not found."
+fi
+
+export REACT_APP_USE_ADMOB_TEST_ADS=false
+
+echo "REACT_APP_USE_ADMOB_TEST_ADS=$REACT_APP_USE_ADMOB_TEST_ADS"
+echo "REACT_APP_ADMOB_ANDROID_BANNER_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_BANNER_ID:-}")"
+echo "REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID:-}")"
+echo "REACT_APP_ADMOB_ANDROID_REWARDED_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_REWARDED_ID:-}")"
+echo "REACT_APP_ADMOB_ANDROID_APP_OPEN_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_APP_OPEN_ID:-}")"
+echo "Do not upload this AAB if required production AdMob IDs are missing."
+
+require_admob_release_id REACT_APP_ADMOB_ANDROID_BANNER_ID "banner"
+if is_interstitial_admob_enabled; then
+  require_admob_release_id REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID "interstitial"
+fi
+
+echo ""
+echo "Installing frontend dependencies..."
 npm ci --prefer-offline --no-audit --registry="$NPM_REGISTRY"
 
 echo ""
 echo "Building React production bundle with AdMob production env config..."
-export REACT_APP_USE_ADMOB_TEST_ADS=false
-for admob_env_name in \
-  REACT_APP_ADMOB_ANDROID_BANNER_ID \
-  REACT_APP_ADMOB_ANDROID_APP_OPEN_ID \
-  REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID \
-  REACT_APP_ADMOB_ANDROID_REWARDED_ID
-do
-  if [ -z "${!admob_env_name:-}" ]; then
-    echo "WARNING: $admob_env_name is not set. That AdMob format will be skipped in the release bundle."
-  fi
-done
 npm run build
 
 echo ""
