@@ -7,10 +7,11 @@ import {
   syncAdMobBannerLayoutForViewport,
 } from "../services/admob";
 
-const POPUP_REPEAT_INTERVAL_MS = 20000;
+const POPUP_REPEAT_INTERVAL_MS = 5 * 60 * 1000;
 const LOCAL_VIDEO_DURATION_MS = 10000;
-const GOOGLE_AD_DURATION_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
+const BANNER_ONLY_PHASE_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
 const POSITION_KEY = "goodone_floating_video_position";
+export const LOCAL_FLOATING_VIDEO_STORAGE_KEY = "GOODONE_LOCAL_VIDEO_AD";
 const EDGE_GAP = 12;
 const DEFAULT_BOTTOM_AD_RESERVED_PX = 50;
 const DRAG_THRESHOLD_PX = 7;
@@ -21,6 +22,18 @@ const VIEWPORT_WIDTH_CSS_VARIABLE = "--goodone-viewport-width";
 const ADMOB_LAYOUT_EVENT = "goodone:admob-banner-layout-change";
 const NATIVE_SAFE_AREA_EVENT = "goodone:native-safe-area-change";
 const VIDEO_SRC = "/media/goodone-intro.mp4";
+
+export const isLocalFloatingVideoAdEnabled = () => {
+  if (process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD === "true") {
+    return true;
+  }
+
+  try {
+    return window.localStorage?.getItem(LOCAL_FLOATING_VIDEO_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+};
 
 const getWindowSize = () => ({
   width: window.visualViewport?.width || window.innerWidth,
@@ -116,6 +129,7 @@ const getNativeBottomChromeReservedHeight = () => {
 
 export default function AppVideoManager() {
   const isNative = Capacitor.isNativePlatform();
+  const isLocalFloatingVideoEnabled = isNative && isLocalFloatingVideoAdEnabled();
   const [showFloating, setShowFloating] = useState(false);
   const [floatingPosition, setFloatingPosition] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -265,16 +279,29 @@ export default function AppVideoManager() {
     setShowFloating(false);
     ensureBottomAdMobBanner();
 
+    if (!isLocalFloatingVideoEnabled) return;
+
     cycleTimerRef.current = setTimeout(() => {
       cycleTimerRef.current = null;
       showLocalVideoPhaseRef.current();
-    }, GOOGLE_AD_DURATION_MS);
-  }, [clearCycleTimer, ensureBottomAdMobBanner, isNative, resetFloatingInteraction]);
+    }, BANNER_ONLY_PHASE_MS);
+  }, [
+    clearCycleTimer,
+    ensureBottomAdMobBanner,
+    isLocalFloatingVideoEnabled,
+    isNative,
+    resetFloatingInteraction,
+  ]);
 
   const showLocalVideoPhase = useCallback(() => {
     clearCycleTimer();
-    if (!isNative || document.visibilityState !== "visible") return;
+    if (
+      !isNative ||
+      !isLocalFloatingVideoEnabled ||
+      document.visibilityState !== "visible"
+    ) return;
 
+    // This is a local GoodOne promo video. It is not an AdMob ad and does not earn AdMob revenue.
     resetFloatingInteraction();
     ensureBottomAdMobBanner();
     setFloatingPosition(loadPosition());
@@ -285,7 +312,14 @@ export default function AppVideoManager() {
       setShowFloating(false);
       showAdMobPhaseRef.current();
     }, LOCAL_VIDEO_DURATION_MS);
-  }, [clearCycleTimer, ensureBottomAdMobBanner, isNative, loadPosition, resetFloatingInteraction]);
+  }, [
+    clearCycleTimer,
+    ensureBottomAdMobBanner,
+    isLocalFloatingVideoEnabled,
+    isNative,
+    loadPosition,
+    resetFloatingInteraction,
+  ]);
 
   useEffect(() => {
     showAdMobPhaseRef.current = showAdMobPhase;

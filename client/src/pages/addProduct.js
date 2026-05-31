@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { productAPI } from '../api';
 import toast from 'react-hot-toast';
+import { markVendorPostSuccessForInterstitial } from '../services/admob';
 
 const CATEGORIES = ['Electronics','Mobiles','Furniture','Clothing','Books','Sports','Home & Garden','Vehicles','Food','Other'];
 const CONDITIONS = [
@@ -45,6 +46,7 @@ export default function AddProduct() {
       Object.entries(form).forEach(([k, v]) => fd.append(k, v));
       images.forEach(img => fd.append('images', img));
       await productAPI.create(fd);
+      markVendorPostSuccessForInterstitial();
       toast.success('Product listed successfully! Active for 24 hours.');
       navigate('/dashboard');
     } catch (err) {

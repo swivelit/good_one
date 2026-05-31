@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { BrowserRouter, HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './AuthContext';
+import AdMobDebugPanel from './components/AdMobDebugPanel';
 import AppVideoManager from './components/AppVideoManager';
 import Navbar from './Navbar';
 import Footer from './footer';
@@ -22,6 +23,12 @@ import NotFound from './pages/NotFoundPage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import AccountDeletionPage from './pages/AccountDeletionPage';
 import TermsOfUse from './pages/TermsOfUse';
+import {
+  consumeVendorPostSuccessInterstitialFlag,
+  maybeShowProductDetailReturnInterstitial,
+  maybeShowVendorPostSuccessInterstitial,
+  trackProductDetailView,
+} from './services/admob';
 
 const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter;
 
@@ -46,11 +53,36 @@ const NativeStartRoute = () => {
 function AppRoutes() {
   const { user } = useAuth();
   const location = useLocation();
+  const previousPathRef = useRef(location.pathname);
   const isNative = Capacitor.isNativePlatform();
   const hideNativeAuthChrome =
     isNative &&
     !user &&
     ["/", "/login", "/forgot-password", "/register/customer", "/register/vendor"].includes(location.pathname);
+
+  useEffect(() => {
+    const previousPath = previousPathRef.current;
+    const currentPath = location.pathname;
+    const isProductDetailPath = (path) => /^\/products\/[^/]+/.test(path);
+    const isBrowsePath = currentPath === "/" || currentPath === "/browse";
+
+    if (isProductDetailPath(currentPath)) {
+      trackProductDetailView();
+    }
+
+    if (isProductDetailPath(previousPath) && isBrowsePath) {
+      void maybeShowProductDetailReturnInterstitial(currentPath);
+    }
+
+    if (
+      currentPath === "/dashboard" &&
+      consumeVendorPostSuccessInterstitialFlag()
+    ) {
+      void maybeShowVendorPostSuccessInterstitial(currentPath);
+    }
+
+    previousPathRef.current = currentPath;
+  }, [location.pathname]);
 
   return (
     <div className={isNative ? `native-app-shell ${user ? "native-with-bottom-nav" : ""}` : undefined}>
@@ -86,6 +118,7 @@ export default function App() {
       <Router>
         <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
         <AppVideoManager />
+        <AdMobDebugPanel />
         <AppRoutes />
       </Router>
     </AuthProvider>

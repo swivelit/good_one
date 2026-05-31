@@ -114,8 +114,18 @@ cd "$CLIENT_DIR"
 npm ci --prefer-offline --no-audit --registry="$NPM_REGISTRY"
 
 echo ""
-echo "Building React production bundle with live AdMob IDs..."
+echo "Building React production bundle with AdMob production env config..."
 export REACT_APP_USE_ADMOB_TEST_ADS=false
+for admob_env_name in \
+  REACT_APP_ADMOB_ANDROID_BANNER_ID \
+  REACT_APP_ADMOB_ANDROID_APP_OPEN_ID \
+  REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID \
+  REACT_APP_ADMOB_ANDROID_REWARDED_ID
+do
+  if [ -z "${!admob_env_name:-}" ]; then
+    echo "WARNING: $admob_env_name is not set. That AdMob format will be skipped in the release bundle."
+  fi
+done
 npm run build
 
 echo ""
