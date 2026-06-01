@@ -5,6 +5,8 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './AuthContext';
 import AdMobDebugPanel from './components/AdMobDebugPanel';
 import AppVideoManager from './components/AppVideoManager';
+import ForceUpdateGate from './components/ForceUpdateGate';
+import NativeBackButtonHandler from './components/NativeBackButtonHandler';
 import Navbar from './Navbar';
 import Footer from './footer';
 import HomePage from './pages/HomePage';
@@ -119,6 +121,8 @@ export default function App() {
         <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
         <AppVideoManager />
         <AdMobDebugPanel />
+        <ForceUpdateGate />
+        <NativeBackButtonHandler />
         <AppRoutes />
       </Router>
     </AuthProvider>

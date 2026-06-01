@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { productAPI, chatAPI, reportAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import toast from "react-hot-toast";
 import { getUploadUrl } from "../config";
+import { isSafeInternalPath } from "../components/NativeBackButtonHandler";
 
 function getTimeLeft(expiresAt) {
   const diff = new Date(expiresAt) - new Date();
@@ -25,7 +26,12 @@ export default function ProductDetail() {
   const [chatLoading, setChatLoading] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const browsePath = "/browse";
+  const returnPath = isSafeInternalPath(location.state?.from)
+    ? location.state.from.trim()
+    : browsePath;
+  const returnLabel = returnPath.startsWith("/dashboard") ? "Dashboard" : "Browse";
 
  useEffect(() => {
     productAPI
@@ -107,8 +113,8 @@ export default function ProductDetail() {
       <div className="container py-5 text-center">
         <i className="bi bi-box-seam display-1 text-muted"></i>
         <h4 className="mt-3">Product not found</h4>
-        <Link to={browsePath} className="btn btn-primary-custom mt-3">
-          ← Browse Products
+        <Link to={returnPath} className="btn btn-primary-custom mt-3">
+          {returnLabel === "Dashboard" ? "Back to Dashboard" : "Browse Products"}
         </Link>
       </div>
     );
@@ -124,7 +130,7 @@ export default function ProductDetail() {
       <nav aria-label="breadcrumb" className="mb-4">
         <ol className="breadcrumb">
           <li className="breadcrumb-item">
-            <Link to={browsePath}>Browse</Link>
+            <Link to={returnPath}>{returnLabel}</Link>
           </li>
           <li className="breadcrumb-item">
             <Link to={`${browsePath}?category=${encodeURIComponent(product.category)}`}>

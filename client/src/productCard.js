@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { getUploadUrl } from './config';
 
 function getTimeLeft(expiresAt) {
@@ -19,6 +19,8 @@ const CONDITION_COLORS = { 'new':'success','like-new':'info','good':'primary','f
  const PLACEHOLDER = "/assets/icons/product-placeholder.png";
 
 export default function ProductCard({ product }) {
+  const location = useLocation();
+  const currentPath = `${location.pathname}${location.search}${location.hash}`;
 
 const timer = getTimeLeft(product.expiresAt);
   
@@ -29,7 +31,11 @@ const imgSrc = product?.images?.[0]
 
   return (
     <div className="product-card card h-100">
-      <Link to={`/products/${product._id}`} className="text-decoration-none">
+      <Link
+        to={`/products/${product._id}`}
+        state={{ from: currentPath }}
+        className="text-decoration-none"
+      >
         <div className="position-relative">
           <img src={imgSrc} className="card-img-top" alt={product.title}
             onError={e => { e.target.src = PLACEHOLDER; }} />

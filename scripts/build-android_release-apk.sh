@@ -20,6 +20,28 @@ APK_TARGET="$OUTPUT_DIR/goodone-release.apk"
 
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org/}"
 
+export_android_version_env() {
+  local gradle_file="$ANDROID_DIR/app/build.gradle"
+  local version_code
+  local version_name
+
+  if [ ! -f "$gradle_file" ]; then
+    echo "ERROR: Android Gradle file not found at $gradle_file"
+    exit 1
+  fi
+
+  version_code="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\1/p' "$gradle_file" | head -n 1)"
+  version_name="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]+"([^"]+)".*/\1/p' "$gradle_file" | head -n 1)"
+
+  if [ -z "$version_code" ] || [ -z "$version_name" ]; then
+    echo "ERROR: Could not parse versionCode/versionName from $gradle_file"
+    exit 1
+  fi
+
+  export REACT_APP_ANDROID_VERSION_CODE="$version_code"
+  export REACT_APP_ANDROID_VERSION_NAME="$version_name"
+}
+
 mask_admob_id() {
   local ad_id="${1:-}"
 
@@ -168,8 +190,11 @@ else
 fi
 
 export REACT_APP_USE_ADMOB_TEST_ADS=false
+export_android_version_env
 
 echo "REACT_APP_USE_ADMOB_TEST_ADS=$REACT_APP_USE_ADMOB_TEST_ADS"
+echo "REACT_APP_ANDROID_VERSION_CODE=$REACT_APP_ANDROID_VERSION_CODE"
+echo "REACT_APP_ANDROID_VERSION_NAME=$REACT_APP_ANDROID_VERSION_NAME"
 echo "REACT_APP_ADMOB_ANDROID_BANNER_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_BANNER_ID:-}")"
 echo "REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID:-}")"
 echo "REACT_APP_ADMOB_ANDROID_REWARDED_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_REWARDED_ID:-}")"

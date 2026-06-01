@@ -4,6 +4,7 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
@@ -11,6 +12,10 @@ import android.view.Window;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -20,10 +25,17 @@ import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.WebViewListener;
+import com.google.android.play.core.appupdate.AppUpdateInfo;
+import com.google.android.play.core.appupdate.AppUpdateManager;
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
+import com.google.android.play.core.appupdate.AppUpdateOptions;
+import com.google.android.play.core.install.model.AppUpdateType;
+import com.google.android.play.core.install.model.UpdateAvailability;
 
 import java.util.Locale;
 
 public class MainActivity extends BridgeActivity {
+    private static final String TAG = "GoodOneMainActivity";
     private static final String GOODONE_SAFE_AREA_CHANGE_EVENT = "goodone:native-safe-area-change";
     private static final int STATUS_BAR_COLOR = Color.rgb(17, 24, 39);
     private static final int APP_WINDOW_BACKGROUND_COLOR = Color.WHITE;
@@ -31,6 +43,18 @@ public class MainActivity extends BridgeActivity {
     private Insets lastSafeAreaInsets = Insets.of(0, 0, 0, 0);
     private View adMobInsetGuardRoot;
     private ViewTreeObserver.OnGlobalLayoutListener adMobInsetGuardLayoutListener;
+    private AppUpdateManager appUpdateManager;
+    private boolean isImmediateUpdateFlowActive = false;
+    private boolean isUpdateRequiredDialogShowing = false;
+
+    private final ActivityResultLauncher<IntentSenderRequest> immediateUpdateLauncher =
+        registerForActivityResult(new ActivityResultContracts.StartIntentSenderForResult(), result -> {
+            isImmediateUpdateFlowActive = false;
+            if (result.getResultCode() != RESULT_OK) {
+                Log.w(TAG, "Immediate update flow was canceled or failed: " + result.getResultCode());
+                showUpdateRequiredDialog();
+            }
+        });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,12 +73,104 @@ public class MainActivity extends BridgeActivity {
         configureEdgeToEdgeWindow();
         installSafeAreaInsetsBridge();
         installAdMobInsetGuard();
+        appUpdateManager = AppUpdateManagerFactory.create(this);
+        checkForImmediateUpdate();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        resumeImmediateUpdateIfNeeded();
     }
 
     @Override
     public void onDestroy() {
         uninstallAdMobInsetGuard();
         super.onDestroy();
+    }
+
+    private void checkForImmediateUpdate() {
+        AppUpdateManager manager = getAppUpdateManager();
+        if (manager == null) return;
+
+        manager.getAppUpdateInfo()
+            .addOnSuccessListener(appUpdateInfo -> {
+                if (
+                    appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
+                    appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
+                ) {
+                    startImmediateUpdate(appUpdateInfo);
+                }
+            })
+            .addOnFailureListener(error ->
+                Log.w(TAG, "Unable to check Google Play update availability", error)
+            );
+    }
+
+    private void resumeImmediateUpdateIfNeeded() {
+        AppUpdateManager manager = getAppUpdateManager();
+        if (manager == null) return;
+
+        manager.getAppUpdateInfo()
+            .addOnSuccessListener(appUpdateInfo -> {
+                if (
+                    appUpdateInfo.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS &&
+                    appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
+                ) {
+                    startImmediateUpdate(appUpdateInfo);
+                }
+            })
+            .addOnFailureListener(error ->
+                Log.w(TAG, "Unable to resume Google Play immediate update flow", error)
+            );
+    }
+
+    private AppUpdateManager getAppUpdateManager() {
+        if (appUpdateManager == null) {
+            try {
+                appUpdateManager = AppUpdateManagerFactory.create(this);
+            } catch (Exception error) {
+                Log.w(TAG, "Unable to create Google Play update manager", error);
+                return null;
+            }
+        }
+        return appUpdateManager;
+    }
+
+    private void startImmediateUpdate(AppUpdateInfo appUpdateInfo) {
+        if (isFinishing() || isDestroyed() || isImmediateUpdateFlowActive) return;
+
+        try {
+            isImmediateUpdateFlowActive = true;
+            getAppUpdateManager().startUpdateFlowForResult(
+                appUpdateInfo,
+                immediateUpdateLauncher,
+                AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE).build()
+            );
+        } catch (Exception error) {
+            isImmediateUpdateFlowActive = false;
+            Log.w(TAG, "Unable to launch Google Play immediate update flow", error);
+            showUpdateRequiredDialog();
+        }
+    }
+
+    private void showUpdateRequiredDialog() {
+        if (isFinishing() || isDestroyed() || isUpdateRequiredDialogShowing) return;
+
+        isUpdateRequiredDialogShowing = true;
+        new AlertDialog.Builder(this)
+            .setTitle("Update required")
+            .setMessage("A newer version of GoodOne is required to continue.")
+            .setCancelable(false)
+            .setPositiveButton("Update", (dialog, which) -> {
+                isUpdateRequiredDialogShowing = false;
+                checkForImmediateUpdate();
+            })
+            .setNegativeButton("Close app", (dialog, which) -> {
+                isUpdateRequiredDialogShowing = false;
+                finishAndRemoveTask();
+            })
+            .show();
     }
 
     private void configureEdgeToEdgeWindow() {

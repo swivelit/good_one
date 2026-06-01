@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
 import { API_URL } from './config';
 
 const VIEWER_ID_KEY = 'goodone_viewer_id';
@@ -24,6 +25,27 @@ const getViewerId = () => {
   }
 };
 
+const isNativeApp = () => {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+};
+
+const addNativeAppHeaders = (headers) => {
+  if (!isNativeApp()) return;
+
+  const platform = Capacitor.getPlatform();
+  if (platform) headers['X-App-Platform'] = platform;
+  if (process.env.REACT_APP_ANDROID_VERSION_CODE) {
+    headers['X-App-Version-Code'] = process.env.REACT_APP_ANDROID_VERSION_CODE;
+  }
+  if (process.env.REACT_APP_ANDROID_VERSION_NAME) {
+    headers['X-App-Version-Name'] = process.env.REACT_APP_ANDROID_VERSION_NAME;
+  }
+};
+
 const API = axios.create({ 
   baseURL: API_URL
 });
@@ -40,8 +62,27 @@ API.interceptors.request.use((config) => {
   config.headers = config.headers || {};
   if (token) config.headers.Authorization = `Bearer ${token}`;
   if (viewerId) config.headers['X-Viewer-Id'] = viewerId;
+  addNativeAppHeaders(config.headers);
   return config;
 });
+
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const response = error?.response;
+    if (
+      response?.status === 426 &&
+      response?.data?.code === 'UPDATE_REQUIRED' &&
+      typeof window !== 'undefined'
+    ) {
+      window.dispatchEvent(new CustomEvent('goodone:update-required', {
+        detail: response.data,
+      }));
+    }
+
+    return Promise.reject(error);
+  },
+);
 
 export const authAPI = {
    sendOtp: (data) => API.post("/sendOtp", data),
@@ -69,6 +110,10 @@ export const productAPI = {
 
 export const statsAPI = {
   getPublic: () => API.get('/stats/public'),
+};
+
+export const appConfigAPI = {
+  get: (params) => API.get('/app-config', { params }),
 };
 
 export const chatAPI = {

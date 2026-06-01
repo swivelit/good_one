@@ -410,6 +410,7 @@ export default function VendorDashboard() {
                               </button>
                               <Link
                                 to={`/products/${p._id}`}
+                                state={{ from: "/dashboard" }}
                                 className="btn btn-sm btn-outline-primary"
                               >
                                 <i className="bi bi-eye"></i>

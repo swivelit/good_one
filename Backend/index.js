@@ -6,6 +6,8 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const prisma = require('./Db/prisma');
 const otpRoutes = require('./Routes/otpRouter');
+const appConfigRoutes = require('./Routes/appConfigRoutes');
+const appVersionGate = require('./middleware/appVersionGate');
 const { uploadsDir } = require('./config/uploads');
 const { sanitizeUser } = require('./utils/serialize');
 
@@ -95,14 +97,15 @@ app.get('/', (req, res) => {
 
 app.use('/api', otpRoutes);
 app.use('/api/auth', require('./Routes/authRoutes'));
+app.use('/api/app-config', appConfigRoutes);
+app.get('/api/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));
+app.use(appVersionGate);
 app.use('/api/products', require('./Routes/productRouter'));
 app.use('/api/stats', require('./Routes/statsRoutes'));
 app.use('/api/chat', require('./Routes/chatRoutes'));
 app.use('/api/vendors', require('./Routes/vendorRoutes'));
 app.use('/api/reports', require('./Routes/reportRoutes'));
 app.use('/api/blocks', require('./Routes/blockRoutes'));
-
-app.get('/api/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));
 
 const connectedUsers = new Map();
 

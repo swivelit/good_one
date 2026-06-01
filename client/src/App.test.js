@@ -2,7 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { AdMob } from '@capacitor-community/admob';
+import API from './api';
 import App from './App';
 import AppVideoManager, {
   BANNER_ONLY_PHASE_MS,
@@ -14,11 +16,16 @@ import AppVideoManager, {
   isLocalFloatingVideoRouteAllowed,
   syncNativeViewportCssVariables,
 } from './components/AppVideoManager';
+import ForceUpdateGate from './components/ForceUpdateGate';
+import { getNativeBackTarget } from './components/NativeBackButtonHandler';
 import MobileWelcomePage from './pages/MobileWelcomePage';
 
 const mockAdMobListeners = {};
+const mockCapacitorAppListeners = {};
 let mockRouterPathname = '/';
 const androidResDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res');
+const androidBuildGradlePath = path.join(__dirname, '..', 'android', 'app', 'build.gradle');
+const mainActivityPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java', 'com', 'goodone', 'marketplace', 'MainActivity.java');
 const LOCAL_VIDEO_ENV_KEYS = [
   'REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD',
   'REACT_APP_LOCAL_FLOATING_VIDEO_REPEAT_MS',
@@ -40,6 +47,18 @@ jest.mock('@capacitor/core', () => ({
   Capacitor: {
     isNativePlatform: jest.fn(() => false),
     getPlatform: jest.fn(() => 'android'),
+  },
+}));
+
+jest.mock('@capacitor/app', () => ({
+  App: {
+    addListener: jest.fn((eventName, callback) => {
+      mockCapacitorAppListeners[eventName] = callback;
+      return Promise.resolve({ remove: jest.fn() });
+    }),
+    minimizeApp: jest.fn(() => Promise.resolve()),
+    exitApp: jest.fn(() => Promise.resolve()),
+    getInfo: jest.fn(() => Promise.resolve({ version: '1.3', build: '4' })),
   },
 }));
 
@@ -130,6 +149,9 @@ beforeEach(() => {
   LOCAL_VIDEO_ENV_KEYS.forEach((key) => {
     delete process.env[key];
   });
+  Object.keys(mockCapacitorAppListeners).forEach((eventName) => {
+    delete mockCapacitorAppListeners[eventName];
+  });
   jest.clearAllMocks();
   mockRouterPathname = '/';
   document.body.className = '';
@@ -137,6 +159,13 @@ beforeEach(() => {
   jest.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve());
   Capacitor.isNativePlatform.mockReturnValue(false);
   Capacitor.getPlatform.mockReturnValue('android');
+  CapacitorApp.addListener.mockImplementation((eventName, callback) => {
+    mockCapacitorAppListeners[eventName] = callback;
+    return Promise.resolve({ remove: jest.fn() });
+  });
+  CapacitorApp.minimizeApp.mockResolvedValue();
+  CapacitorApp.exitApp.mockResolvedValue();
+  CapacitorApp.getInfo.mockResolvedValue({ version: '1.3', build: '4' });
   Object.defineProperty(document, 'visibilityState', {
     configurable: true,
     get: () => 'visible',
@@ -145,6 +174,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  if (API.get.mockRestore) {
+    API.get.mockRestore();
+  }
   jest.useRealTimers();
 });
 
@@ -205,6 +237,59 @@ test('Android night resources do not include splash PNGs', () => {
     .filter((filePath) => /night.*splash\.png/i.test(filePath));
 
   expect(nightSplashFiles).toEqual([]);
+});
+
+test('Android Gradle config includes Play app-update dependency', () => {
+  const buildGradle = fs.readFileSync(androidBuildGradlePath, 'utf8');
+
+  expect(buildGradle).toMatch(/com\.google\.android\.play:app-update:2\.1\.0/);
+});
+
+test('MainActivity includes immediate Play update support', () => {
+  const mainActivity = fs.readFileSync(mainActivityPath, 'utf8');
+
+  expect(mainActivity).toMatch(/AppUpdateManagerFactory/);
+  expect(mainActivity).toMatch(/AppUpdateType\.IMMEDIATE/);
+  expect(mainActivity).toMatch(/DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS/);
+});
+
+test('NativeBackButtonHandler returns product source path when it is safe', () => {
+  expect(getNativeBackTarget({
+    pathname: '/products/123',
+    state: { from: '/browse?category=Mobiles' },
+  })).toEqual({
+    action: 'navigate',
+    to: '/browse?category=Mobiles',
+    replace: true,
+  });
+});
+
+test('NativeBackButtonHandler returns browse for product detail without source state', () => {
+  expect(getNativeBackTarget({
+    pathname: '/products/123',
+    state: null,
+  })).toEqual({
+    action: 'navigate',
+    to: '/browse',
+    replace: true,
+  });
+});
+
+test('NativeBackButtonHandler ignores unsafe external product source state', () => {
+  expect(getNativeBackTarget({
+    pathname: '/products/123',
+    state: { from: 'https://example.com/browse' },
+  })).toEqual({
+    action: 'navigate',
+    to: '/browse',
+    replace: true,
+  });
+});
+
+test('NativeBackButtonHandler minimizes on root browse path', () => {
+  expect(getNativeBackTarget({
+    pathname: '/browse',
+  })).toEqual({ action: 'minimize' });
 });
 
 test('AppVideoManager stays hidden on web', () => {
@@ -321,6 +406,63 @@ const flushPromises = async () => {
     await Promise.resolve();
   }
 };
+
+test('ForceUpdateGate renders nothing on web', () => {
+  Capacitor.isNativePlatform.mockReturnValue(false);
+
+  const { container } = render(<ForceUpdateGate />);
+
+  expect(container).toBeEmptyDOMElement();
+});
+
+test('ForceUpdateGate renders blocking overlay when native Android config requires update', async () => {
+  Capacitor.isNativePlatform.mockReturnValue(true);
+  Capacitor.getPlatform.mockReturnValue('android');
+  jest.spyOn(API, 'get').mockResolvedValue({
+    data: {
+      android: { updateRequired: true },
+      playStoreUrl: 'https://play.google.com/store/apps/details?id=com.goodone.marketplace',
+    },
+  });
+
+  render(<ForceUpdateGate />);
+
+  await act(async () => {
+    await flushPromises();
+  });
+
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(screen.getByText('Update required')).toBeInTheDocument();
+});
+
+test('ForceUpdateGate renders overlay after update-required event', async () => {
+  Capacitor.isNativePlatform.mockReturnValue(true);
+  Capacitor.getPlatform.mockReturnValue('android');
+  jest.spyOn(API, 'get').mockResolvedValue({
+    data: {
+      android: { updateRequired: false },
+      playStoreUrl: 'https://play.google.com/store/apps/details?id=com.goodone.marketplace',
+    },
+  });
+
+  render(<ForceUpdateGate />);
+
+  await act(async () => {
+    await flushPromises();
+  });
+
+  act(() => {
+    window.dispatchEvent(new CustomEvent('goodone:update-required', {
+      detail: {
+        code: 'UPDATE_REQUIRED',
+        playStoreUrl: 'https://play.google.com/store/apps/details?id=com.goodone.marketplace',
+      },
+    }));
+  });
+
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(screen.getByText('Update required')).toBeInTheDocument();
+});
 
 const advanceTimers = async (milliseconds) => {
   await act(async () => {

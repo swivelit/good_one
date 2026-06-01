@@ -11,6 +11,28 @@ APK_TARGET="$OUTPUT_DIR/goodone-debug.apk"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org/}"
 USE_ADMOB_TEST_ADS="${REACT_APP_USE_ADMOB_TEST_ADS:-true}"
 
+export_android_version_env() {
+  local gradle_file="$ANDROID_DIR/app/build.gradle"
+  local version_code
+  local version_name
+
+  if [ ! -f "$gradle_file" ]; then
+    echo "ERROR: Android Gradle file not found at $gradle_file"
+    exit 1
+  fi
+
+  version_code="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\1/p' "$gradle_file" | head -n 1)"
+  version_name="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]+"([^"]+)".*/\1/p' "$gradle_file" | head -n 1)"
+
+  if [ -z "$version_code" ] || [ -z "$version_name" ]; then
+    echo "ERROR: Could not parse versionCode/versionName from $gradle_file"
+    exit 1
+  fi
+
+  export REACT_APP_ANDROID_VERSION_CODE="$version_code"
+  export REACT_APP_ANDROID_VERSION_NAME="$version_name"
+}
+
 cat <<'BANNER'
 ========================================
  GoodOne Android APK Build
@@ -78,8 +100,12 @@ fi
 
 echo ""
 echo "Building React app..."
-echo "REACT_APP_USE_ADMOB_TEST_ADS=$USE_ADMOB_TEST_ADS"
-REACT_APP_USE_ADMOB_TEST_ADS="$USE_ADMOB_TEST_ADS" npm run build
+export_android_version_env
+export REACT_APP_USE_ADMOB_TEST_ADS="$USE_ADMOB_TEST_ADS"
+echo "REACT_APP_USE_ADMOB_TEST_ADS=$REACT_APP_USE_ADMOB_TEST_ADS"
+echo "REACT_APP_ANDROID_VERSION_CODE=$REACT_APP_ANDROID_VERSION_CODE"
+echo "REACT_APP_ANDROID_VERSION_NAME=$REACT_APP_ANDROID_VERSION_NAME"
+npm run build
 
 echo ""
 echo "Syncing Capacitor Android..."
