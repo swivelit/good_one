@@ -8,9 +8,11 @@ import {
   syncAdMobBannerLayoutForViewport,
 } from "../services/admob";
 
-const POPUP_REPEAT_INTERVAL_MS = 5 * 60 * 1000;
-const LOCAL_VIDEO_DURATION_MS = 10000;
-const BANNER_ONLY_PHASE_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
+export const POPUP_REPEAT_INTERVAL_MS = 20000;
+export const LOCAL_VIDEO_DURATION_MS = 10000;
+export const BANNER_ONLY_PHASE_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
+const MIN_POPUP_REPEAT_INTERVAL_MS = 20000;
+const MIN_LOCAL_VIDEO_DURATION_MS = 5000;
 const POSITION_KEY = "goodone_floating_video_position";
 export const LOCAL_FLOATING_VIDEO_STORAGE_KEY = "GOODONE_LOCAL_VIDEO_AD";
 const EDGE_GAP = 12;
@@ -56,7 +58,7 @@ export const isLocalFloatingVideoAdEnabled = ({
   isNative = Capacitor.isNativePlatform(),
   platform = typeof Capacitor.getPlatform === "function" ? Capacitor.getPlatform() : "web",
 } = {}) => {
-  if (!isNative) return false;
+  if (!isNative || platform !== "android") return false;
 
   const storageOverride = getLocalFloatingVideoStorageOverride();
   if (storageOverride !== null) return storageOverride;
@@ -69,7 +71,41 @@ export const isLocalFloatingVideoAdEnabled = ({
     return true;
   }
 
-  return platform === "android";
+  return true;
+};
+
+const parseTimingEnvMs = (value, fallback, minimum) => {
+  const parsedValue = Number(value);
+  if (Number.isInteger(parsedValue) && parsedValue >= minimum) {
+    return parsedValue;
+  }
+
+  return fallback;
+};
+
+export const getLocalFloatingVideoTiming = ({
+  repeatMs = process.env.REACT_APP_LOCAL_FLOATING_VIDEO_REPEAT_MS,
+  durationMs = process.env.REACT_APP_LOCAL_FLOATING_VIDEO_DURATION_MS,
+} = {}) => {
+  const popupRepeatIntervalMs = parseTimingEnvMs(
+    repeatMs,
+    POPUP_REPEAT_INTERVAL_MS,
+    MIN_POPUP_REPEAT_INTERVAL_MS
+  );
+  const localVideoDurationMs = Math.min(
+    parseTimingEnvMs(
+      durationMs,
+      LOCAL_VIDEO_DURATION_MS,
+      MIN_LOCAL_VIDEO_DURATION_MS
+    ),
+    popupRepeatIntervalMs
+  );
+
+  return {
+    popupRepeatIntervalMs,
+    localVideoDurationMs,
+    bannerOnlyPhaseMs: popupRepeatIntervalMs - localVideoDurationMs,
+  };
 };
 
 const getWindowSize = () => ({
@@ -327,10 +363,11 @@ export default function AppVideoManager() {
 
     if (!canShowLocalFloatingVideo) return;
 
+    const { bannerOnlyPhaseMs } = getLocalFloatingVideoTiming();
     cycleTimerRef.current = setTimeout(() => {
       cycleTimerRef.current = null;
       showLocalVideoPhaseRef.current();
-    }, BANNER_ONLY_PHASE_MS);
+    }, bannerOnlyPhaseMs);
   }, [
     clearCycleTimer,
     canShowLocalFloatingVideo,
@@ -353,11 +390,12 @@ export default function AppVideoManager() {
     setFloatingPosition(loadPosition());
     setShowFloating(true);
 
+    const { localVideoDurationMs } = getLocalFloatingVideoTiming();
     cycleTimerRef.current = setTimeout(() => {
       cycleTimerRef.current = null;
       setShowFloating(false);
       showAdMobPhaseRef.current();
-    }, LOCAL_VIDEO_DURATION_MS);
+    }, localVideoDurationMs);
   }, [
     clearCycleTimer,
     canShowLocalFloatingVideo,

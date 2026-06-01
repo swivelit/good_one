@@ -5,7 +5,11 @@ import { Capacitor } from '@capacitor/core';
 import { AdMob } from '@capacitor-community/admob';
 import App from './App';
 import AppVideoManager, {
+  BANNER_ONLY_PHASE_MS,
   LOCAL_FLOATING_VIDEO_STORAGE_KEY,
+  LOCAL_VIDEO_DURATION_MS,
+  POPUP_REPEAT_INTERVAL_MS,
+  getLocalFloatingVideoTiming,
   isLocalFloatingVideoAdEnabled,
   isLocalFloatingVideoRouteAllowed,
   syncNativeViewportCssVariables,
@@ -15,7 +19,15 @@ import MobileWelcomePage from './pages/MobileWelcomePage';
 const mockAdMobListeners = {};
 let mockRouterPathname = '/';
 const androidResDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res');
-const originalLocalVideoEnv = process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD;
+const LOCAL_VIDEO_ENV_KEYS = [
+  'REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD',
+  'REACT_APP_LOCAL_FLOATING_VIDEO_REPEAT_MS',
+  'REACT_APP_LOCAL_FLOATING_VIDEO_DURATION_MS',
+];
+const originalLocalVideoEnv = LOCAL_VIDEO_ENV_KEYS.reduce((accumulator, key) => {
+  accumulator[key] = process.env[key];
+  return accumulator;
+}, {});
 
 const walkFiles = (directory) => (
   fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -105,15 +117,19 @@ jest.mock('react-router-dom', () => {
 }, { virtual: true });
 
 const restoreLocalVideoEnv = () => {
-  if (originalLocalVideoEnv === undefined) {
-    delete process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD;
-  } else {
-    process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD = originalLocalVideoEnv;
-  }
+  LOCAL_VIDEO_ENV_KEYS.forEach((key) => {
+    if (originalLocalVideoEnv[key] === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = originalLocalVideoEnv[key];
+    }
+  });
 };
 
 beforeEach(() => {
-  delete process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD;
+  LOCAL_VIDEO_ENV_KEYS.forEach((key) => {
+    delete process.env[key];
+  });
   jest.clearAllMocks();
   mockRouterPathname = '/';
   document.body.className = '';
@@ -206,6 +222,50 @@ test('local floating video is enabled by default on native Android', () => {
     isNative: true,
     platform: 'android',
   })).toBe(true);
+  expect(isLocalFloatingVideoAdEnabled({
+    isNative: true,
+    platform: 'ios',
+  })).toBe(false);
+});
+
+test('local floating video timing defaults to the restored 20-second cycle', () => {
+  expect(POPUP_REPEAT_INTERVAL_MS).toBe(20000);
+  expect(LOCAL_VIDEO_DURATION_MS).toBe(10000);
+  expect(BANNER_ONLY_PHASE_MS).toBe(10000);
+  expect(getLocalFloatingVideoTiming()).toEqual({
+    popupRepeatIntervalMs: 20000,
+    localVideoDurationMs: 10000,
+    bannerOnlyPhaseMs: 10000,
+  });
+});
+
+test('local floating video timing env values enforce safe bounds', () => {
+  process.env.REACT_APP_LOCAL_FLOATING_VIDEO_REPEAT_MS = '30000';
+  process.env.REACT_APP_LOCAL_FLOATING_VIDEO_DURATION_MS = '15000';
+
+  expect(getLocalFloatingVideoTiming()).toEqual({
+    popupRepeatIntervalMs: 30000,
+    localVideoDurationMs: 15000,
+    bannerOnlyPhaseMs: 15000,
+  });
+
+  expect(getLocalFloatingVideoTiming({
+    repeatMs: '1000',
+    durationMs: '3000',
+  })).toEqual({
+    popupRepeatIntervalMs: 20000,
+    localVideoDurationMs: 10000,
+    bannerOnlyPhaseMs: 10000,
+  });
+
+  expect(getLocalFloatingVideoTiming({
+    repeatMs: '20000',
+    durationMs: '30000',
+  })).toEqual({
+    popupRepeatIntervalMs: 20000,
+    localVideoDurationMs: 20000,
+    bannerOnlyPhaseMs: 0,
+  });
 });
 
 test('local floating video route policy blocks sensitive routes', () => {
@@ -255,10 +315,6 @@ test('syncNativeViewportCssVariables writes visualViewport dimensions to CSS var
     value: previousVisualViewport,
   });
 });
-
-const POPUP_REPEAT_INTERVAL_MS = 5 * 60 * 1000;
-const LOCAL_VIDEO_DURATION_MS = 10000;
-const BANNER_ONLY_PHASE_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
 
 const flushPromises = async () => {
   for (let index = 0; index < 5; index += 1) {

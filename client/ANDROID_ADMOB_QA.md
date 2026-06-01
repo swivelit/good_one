@@ -178,11 +178,22 @@ The current plugin renders banners as native overlays, not inline React elements
 
 `client/src/components/AppVideoManager.js` can show a small local GoodOne promo video on native Android builds. This is local GoodOne promo media, not AdMob inventory, and it does not earn AdMob revenue.
 
+The local promo uses the restored 20-second cycle: about 10 seconds of normal bottom-banner phase, then about 10 seconds of floating local video, then it repeats.
+
 Disable it for a build with:
 
 ```bash
 REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD=false
 ```
+
+Optional timing controls:
+
+```bash
+REACT_APP_LOCAL_FLOATING_VIDEO_REPEAT_MS=20000
+REACT_APP_LOCAL_FLOATING_VIDEO_DURATION_MS=10000
+```
+
+The default repeat interval is `20000`, the default video duration is `10000`, the minimum repeat interval is `20000`, the minimum video duration is `5000`, and the video duration is capped to the repeat interval.
 
 Force it locally with:
 
@@ -192,7 +203,7 @@ localStorage.setItem("GOODONE_LOCAL_VIDEO_AD", "false")
 localStorage.removeItem("GOODONE_LOCAL_VIDEO_AD")
 ```
 
-The localStorage override wins for local QA. The promo stays hidden on web, stays off login/register/forgot-password/chat/add-product routes, keeps the real AdMob bottom banner visible, floats for about 10 seconds, and repeats no more often than every 5 minutes.
+The localStorage override wins for local QA on native Android. The promo stays hidden on web, stays off login/register/forgot-password/chat/add-product routes, keeps the real AdMob bottom banner visible, and does not generate AdMob impressions or clicks.
 
 ## Mediation Readiness
 
