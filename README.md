@@ -9,12 +9,13 @@ GoodOne marketplace.
 ```sh
 REACT_APP_BACKEND_URL=https://good-one-api.onrender.com
 REACT_APP_API_URL=https://good-one-api.onrender.com/api
+REACT_APP_PUBLIC_WEB_URL=https://good-one-jlcu.onrender.com
 REACT_APP_SUPPORT_EMAIL=goodone@swivelit.in
 ```
 
 Replace `https://good-one-api.onrender.com` before production builds if the real Render backend URL is different. Do not put secrets in React environment files because they are bundled into the app.
 
-React environment variables are public. `client/src/config.js` already falls back to `https://good-one-api.onrender.com` for production builds when these values are not set.
+React environment variables are public. `client/src/config.js` already falls back to `https://good-one-api.onrender.com` for production backend builds and `https://good-one-jlcu.onrender.com` for public share links when these values are not set.
 
 ## Render backend deployment
 
@@ -23,6 +24,7 @@ React environment variables are public. `client/src/config.js` already falls bac
 - Pre-deploy command: `npx prisma migrate deploy`
 - Start command: `npm start`
 - Required environment variables include `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRE`, `CLIENT_URLS`, `EMAIL_USER`, and `EMAIL_PASS`.
+- Chat push notifications require `FIREBASE_SERVICE_ACCOUNT_JSON` in Render/local backend env, or a valid `GOOGLE_APPLICATION_CREDENTIALS` path. Do not commit Firebase service account JSON.
 - Set `CLIENT_URLS=https://good-one-jlcu.onrender.com,capacitor://localhost,ionic://localhost,http://localhost,https://localhost` for the Render backend. Also include the real final frontend domain if it is different.
 
 ## Capacitor mobile apps
@@ -30,6 +32,8 @@ React environment variables are public. `client/src/config.js` already falls bac
 Android already exists at `client/android` and Capacitor Android 7 requires JDK 21 for Gradle builds. If your terminal still uses Java 17, switch `JAVA_HOME` to a JDK 21 install before running Gradle. iOS is generated when needed. Simulator builds require macOS, Xcode 26 or newer, and CocoaPods, but do not require Apple Developer Program payment or signing. Signed iOS device/archive builds require Apple signing; TestFlight and App Store distribution require Apple Developer Program membership. Before iOS sync/build/archive, make sure `xcode-select` points to the full Xcode app and the Xcode license has been accepted.
 
 The current Capacitor app id and Android package are `com.goodone.marketplace`. Finalize this before the first Play Store or App Store upload. If it needs to change, update `client/capacitor.config.json`, `client/android/app/build.gradle`, `client/android/app/src/main/res/values/strings.xml`, and the Xcode target Bundle Identifier.
+
+Android push notifications require `client/android/app/google-services.json` from Firebase for package `com.goodone.marketplace`. Without that file and backend Firebase credentials, the app and server still build and run, but real device push notifications cannot be delivered.
 
 Public policy routes are available without login:
 

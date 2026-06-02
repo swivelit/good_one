@@ -6,6 +6,10 @@ import toast from 'react-hot-toast';
 import { io } from 'socket.io-client';
 import { BACKEND_URL } from '../config';
 
+const getMessageId = (message) => message?._id || message?.id || null;
+const getMessageConversationId = (message) =>
+  message?.conversationId || message?.conversation?._id || message?.conversation || null;
+
 export default function ChatPage() {
   const { conversationId } = useParams();
   const { user } = useAuth();
@@ -19,6 +23,7 @@ export default function ChatPage() {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
+  const activeConvRef = useRef(null);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -38,6 +43,27 @@ export default function ChatPage() {
     } catch { toast.error('Failed to load messages'); }
   }, [navigate]);
 
+  const appendMessage = useCallback((message) => {
+    setMessages((prev) => {
+      const messageId = getMessageId(message);
+      if (messageId && prev.some((existing) => getMessageId(existing) === messageId)) {
+        return prev;
+      }
+      return [...prev, message];
+    });
+  }, []);
+
+  const emitRealtimeMessage = useCallback((conversationIdValue, message) => {
+    socketRef.current?.emit('send-message', {
+      conversationId: conversationIdValue,
+      ...message,
+    });
+  }, []);
+
+  useEffect(() => {
+    activeConvRef.current = activeConv;
+  }, [activeConv]);
+
   useEffect(() => {
     if (!user?._id) return undefined;
 
@@ -47,12 +73,17 @@ export default function ChatPage() {
     });
     socketRef.current.emit('user-online', user._id);
     socketRef.current.on('receive-message', (msg) => {
-      setMessages(prev => [...prev, msg]);
+      const activeConversationId = activeConvRef.current?._id;
+      const messageConversationId = getMessageConversationId(msg);
+      if (activeConversationId && messageConversationId === activeConversationId) {
+        appendMessage(msg);
+      }
+      void fetchConversations();
     });
     socketRef.current.on('user-typing', () => setIsTyping(true));
     socketRef.current.on('user-stop-typing', () => setIsTyping(false));
     return () => socketRef.current?.disconnect();
-  }, [user?._id]);
+  }, [appendMessage, fetchConversations, user?._id]);
 
   useEffect(() => {
     fetchConversations();
@@ -75,8 +106,9 @@ export default function ChatPage() {
     try {
       setSending(true);
       const { data } = await chatAPI.sendMessage(activeConv._id, { text });
-      setMessages(prev => [...prev, data.message]);
-      socketRef.current?.emit('send-message', { conversationId: activeConv._id, ...data.message });
+      appendMessage(data.message);
+      emitRealtimeMessage(activeConv._id, data.message);
+      void fetchConversations();
       setText('');
     } catch { toast.error('Failed to send message'); }
     finally { setSending(false); }
@@ -99,7 +131,9 @@ export default function ChatPage() {
     const meetupText = `📍 Meetup Request\nLocation: ${location}\nDate: ${date}\nTime: ${time}`;
     try {
       const { data } = await chatAPI.sendMessage(activeConv._id, { text: meetupText, type: 'meetup', meetupDetails: { location, date, time } });
-      setMessages(prev => [...prev, data.message]);
+      appendMessage(data.message);
+      emitRealtimeMessage(activeConv._id, data.message);
+      void fetchConversations();
     } catch { toast.error('Failed to send meetup request'); }
   };
 
@@ -109,7 +143,9 @@ export default function ChatPage() {
     const offerText = `💰 Price Offer: ₹${parseInt(price).toLocaleString()}`;
     try {
       const { data } = await chatAPI.sendMessage(activeConv._id, { text: offerText, type: 'offer', offerPrice: parseInt(price) });
-      setMessages(prev => [...prev, data.message]);
+      appendMessage(data.message);
+      emitRealtimeMessage(activeConv._id, data.message);
+      void fetchConversations();
     } catch { toast.error('Failed to send offer'); }
   };
 

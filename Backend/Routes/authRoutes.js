@@ -9,6 +9,8 @@ const {
   resetPassword,
   getMe,
   updateMe,
+  registerPushToken,
+  deletePushToken,
   deleteMe,
 } = require('../Controllers/authController');
 
@@ -54,6 +56,8 @@ router.post('/forgot-password/reset', resetPassword);
 
 router.get('/me', protect, getMe);
 router.put('/me', protect, updateMe);
+router.post('/push-token', protect, registerPushToken);
+router.delete('/push-token', protect, deletePushToken);
 router.delete('/me', protect, deleteMe);
 
 module.exports = router;

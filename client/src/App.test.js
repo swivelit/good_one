@@ -44,6 +44,7 @@ const walkFiles = (directory) => (
 );
 
 jest.mock('@capacitor/core', () => ({
+  registerPlugin: jest.fn(() => ({})),
   Capacitor: {
     isNativePlatform: jest.fn(() => false),
     getPlatform: jest.fn(() => 'android'),
@@ -59,6 +60,31 @@ jest.mock('@capacitor/app', () => ({
     minimizeApp: jest.fn(() => Promise.resolve()),
     exitApp: jest.fn(() => Promise.resolve()),
     getInfo: jest.fn(() => Promise.resolve({ version: '1.3', build: '4' })),
+  },
+}));
+
+jest.mock('@capacitor/push-notifications', () => ({
+  PushNotifications: {
+    checkPermissions: jest.fn(() => Promise.resolve({ receive: 'denied' })),
+    requestPermissions: jest.fn(() => Promise.resolve({ receive: 'denied' })),
+    register: jest.fn(() => Promise.resolve()),
+    addListener: jest.fn(() => Promise.resolve({ remove: jest.fn() })),
+  },
+}));
+
+jest.mock('@capacitor/local-notifications', () => ({
+  LocalNotifications: {
+    checkPermissions: jest.fn(() => Promise.resolve({ display: 'denied' })),
+    requestPermissions: jest.fn(() => Promise.resolve({ display: 'denied' })),
+    createChannel: jest.fn(() => Promise.resolve()),
+    schedule: jest.fn(() => Promise.resolve()),
+    addListener: jest.fn(() => Promise.resolve({ remove: jest.fn() })),
+  },
+}));
+
+jest.mock('@capacitor/share', () => ({
+  Share: {
+    share: jest.fn(() => Promise.resolve()),
   },
 }));
 

@@ -12,3 +12,7 @@ dist/
 !client/.env.admob.release.example
 client/.env.admob.release.local
 client/android/key.properties
+client/android/app/google-services.json
+*service-account*.json
+*firebase-adminsdk*.json
+Backend/firebase*.json

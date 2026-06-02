@@ -1,4 +1,5 @@
 const prisma = require('../Db/prisma');
+const { sendChatNotification } = require('../services/pushNotificationService');
 const { assertCleanFields } = require('../utils/contentModeration');
 const { toCompat } = require('../utils/serialize');
 
@@ -128,6 +129,9 @@ exports.sendMessage = async (req, res) => {
 
     const conversation = await prisma.conversation.findUnique({
       where: { id: req.params.conversationId },
+      include: {
+        product: { select: { id: true, title: true } },
+      },
     });
     if (!conversation) return res.status(404).json({ success: false, message: 'Conversation not found.' });
     if (!isParticipant(conversation, req.user.id)) {
@@ -162,6 +166,13 @@ exports.sendMessage = async (req, res) => {
         lastMessageAt: new Date(),
         unreadCount: { increment: 1 },
       },
+    });
+
+    void sendChatNotification({
+      recipientUserId: otherUserId,
+      sender: message.sender,
+      conversation,
+      message,
     });
 
     res.status(201).json({ success: true, message: toCompat(message) });

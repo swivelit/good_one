@@ -443,6 +443,61 @@ exports.updateMe = async (req, res) => {
   }
 };
 
+exports.registerPushToken = async (req, res) => {
+  try {
+    const token = String(req.body.token || '').trim();
+    const platform = req.body.platform ? String(req.body.platform).trim() : null;
+    const deviceId = req.body.deviceId ? String(req.body.deviceId).trim() : null;
+
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Push token is required.' });
+    }
+
+    await prisma.pushToken.upsert({
+      where: { token },
+      update: {
+        userId: req.user.id,
+        platform,
+        deviceId,
+        enabled: true,
+      },
+      create: {
+        userId: req.user.id,
+        token,
+        platform,
+        deviceId,
+        enabled: true,
+      },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.deletePushToken = async (req, res) => {
+  try {
+    const token = String(req.body.token || '').trim();
+
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Push token is required.' });
+    }
+
+    await prisma.pushToken.updateMany({
+      where: {
+        token,
+        userId: req.user.id,
+      },
+      data: { enabled: false },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.deleteMe = async (req, res) => {
   try {
     const userId = req.user.id;

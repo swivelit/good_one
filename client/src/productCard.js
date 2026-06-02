@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { getUploadUrl } from './config';
+import { shareProduct } from './services/share';
 
 function getTimeLeft(expiresAt) {
   const now = new Date();
@@ -21,6 +22,12 @@ const CONDITION_COLORS = { 'new':'success','like-new':'info','good':'primary','f
 export default function ProductCard({ product }) {
   const location = useLocation();
   const currentPath = `${location.pathname}${location.search}${location.hash}`;
+
+  const handleShare = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    await shareProduct(product);
+  };
 
 const timer = getTimeLeft(product.expiresAt);
   
@@ -75,12 +82,26 @@ const imgSrc = product?.images?.[0]
             style={{width:28,height:28,fontSize:'0.75rem'}}>
             {product.vendorUser?.name?.charAt(0)?.toUpperCase() || 'V'}
           </div>
-          <small className="text-muted">{product.vendor?.businessName || product.vendorUser?.name}</small>
-          {product.vendor?.rating > 0 && (
-            <small className="text-warning ms-auto">
-              <i className="bi bi-star-fill"></i> {product.vendor.rating.toFixed(1)}
-            </small>
-          )}
+          <small className="text-muted text-truncate" style={{minWidth:0}}>
+            {product.vendor?.businessName || product.vendorUser?.name}
+          </small>
+          <div className="ms-auto d-flex align-items-center gap-2 flex-shrink-0">
+            {product.vendor?.rating > 0 && (
+              <small className="text-warning">
+                <i className="bi bi-star-fill"></i> {product.vendor.rating.toFixed(1)}
+              </small>
+            )}
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center"
+              style={{width:32,height:32}}
+              onClick={handleShare}
+              aria-label={`Share ${product.title}`}
+              title="Share product"
+            >
+              <i className="bi bi-share"></i>
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -7,6 +7,7 @@ import AdMobDebugPanel from './components/AdMobDebugPanel';
 import AppVideoManager from './components/AppVideoManager';
 import ForceUpdateGate from './components/ForceUpdateGate';
 import NativeBackButtonHandler from './components/NativeBackButtonHandler';
+import PushNotificationManager from './components/PushNotificationManager';
 import Navbar from './Navbar';
 import Footer from './footer';
 import HomePage from './pages/HomePage';
@@ -123,6 +124,7 @@ export default function App() {
         <AdMobDebugPanel />
         <ForceUpdateGate />
         <NativeBackButtonHandler />
+        <PushNotificationManager />
         <AppRoutes />
       </Router>
     </AuthProvider>

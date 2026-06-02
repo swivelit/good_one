@@ -4,6 +4,7 @@ import { productAPI, vendorAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import toast from "react-hot-toast";
 import { getUploadUrl } from "../config";
+import { shareProduct, shareVendor } from "../services/share";
 
 function getTimeLeft(expiresAt) {
   const diff = new Date(expiresAt) - new Date();
@@ -56,6 +57,11 @@ export default function VendorDashboard() {
     } catch {
       toast.error("Failed to delete");
     }
+  };
+
+  const handleShareProfile = async () => {
+    if (!vendorProfile?._id) return;
+    await shareVendor(vendorProfile);
   };
 
   const activeProducts = products.filter(
@@ -193,12 +199,23 @@ export default function VendorDashboard() {
                   {vendorProfile?.businessName}
                 </small>
               </div>
-              <Link
-                to="/dashboard/add-product"
-                className="btn btn-primary-custom"
-              >
-                <i className="bi bi-plus-circle me-2"></i>Add Product
-              </Link>
+              <div className="d-flex gap-2 flex-wrap">
+                {vendorProfile?._id && (
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={handleShareProfile}
+                  >
+                    <i className="bi bi-share me-2"></i>Share Profile
+                  </button>
+                )}
+                <Link
+                  to="/dashboard/add-product"
+                  className="btn btn-primary-custom"
+                >
+                  <i className="bi bi-plus-circle me-2"></i>Add Product
+                </Link>
+              </div>
             </div>
 
             <div className="row g-3 mb-4 vendor-stat-grid">
@@ -412,9 +429,19 @@ export default function VendorDashboard() {
                                 to={`/products/${p._id}`}
                                 state={{ from: "/dashboard" }}
                                 className="btn btn-sm btn-outline-primary"
+                                title="View product"
                               >
                                 <i className="bi bi-eye"></i>
                               </Link>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={() => shareProduct(p)}
+                                title="Share product"
+                                aria-label={`Share ${p.title}`}
+                              >
+                                <i className="bi bi-share"></i>
+                              </button>
                               <button
                                 className="btn btn-sm btn-outline-danger"
                                 onClick={() => handleDelete(p._id)}

@@ -5,6 +5,7 @@ import { useAuth } from "../AuthContext";
 import toast from "react-hot-toast";
 import { getUploadUrl } from "../config";
 import { isSafeInternalPath } from "../components/NativeBackButtonHandler";
+import { shareProduct } from "../services/share";
 
 function getTimeLeft(expiresAt) {
   const diff = new Date(expiresAt) - new Date();
@@ -245,6 +246,14 @@ export default function ProductDetail() {
             {user?.role === "vendor"
               ? "Chat Not Available for Vendors"
               : "Chat with Vendor"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-lg w-100 mb-3"
+            onClick={() => shareProduct(product)}
+          >
+            <i className="bi bi-share me-2"></i>
+            Share Product
           </button>
           <button
             className="btn btn-outline-danger btn-sm mb-3"

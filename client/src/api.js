@@ -95,6 +95,8 @@ export const authAPI = {
   getMe: () => API.get('/auth/me'),
   updateMe: (data) => API.put('/auth/me', data),
   deleteMe: () => API.delete('/auth/me'),
+  registerPushToken: (data) => API.post('/auth/push-token', data),
+  deletePushToken: (data) => API.delete('/auth/push-token', { data }),
 };
 
 export const productAPI = {

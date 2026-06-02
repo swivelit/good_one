@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { vendorAPI } from '../api';
 import ProductCard from '../productCard';
 import toast from 'react-hot-toast';
+import { shareVendor } from '../services/share';
 
 export default function VendorProfile() {
   const { id } = useParams();
@@ -39,6 +40,14 @@ export default function VendorProfile() {
             </div>
           </div>
           <div className="ms-auto d-flex gap-2 flex-wrap">
+            <button
+              type="button"
+              className="btn btn-light btn-sm fw-semibold"
+              onClick={() => shareVendor(vendor)}
+            >
+              <i className="bi bi-share me-1"></i>
+              Share Vendor Profile
+            </button>
             {vendor.rating > 0 && (
               <div className="bg-white rounded-3 px-3 py-2 text-center">
                 <div className="fw-bold fs-5" style={{color:'#FF6B35'}}>{vendor.rating.toFixed(1)}</div>

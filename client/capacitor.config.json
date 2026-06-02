@@ -2,5 +2,10 @@
   "appId": "com.goodone.marketplace",
   "appName": "GoodOne",
   "webDir": "build",
-  "bundledWebRuntime": false
+  "bundledWebRuntime": false,
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert", "banner", "list"]
+    }
+  }
 }

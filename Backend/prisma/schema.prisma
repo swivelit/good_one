@@ -35,6 +35,7 @@ model User {
   blocksMade            Block[]        @relation("BlockBlocker")
   blocksReceived        Block[]        @relation("BlockBlockedUser")
   productViews          ProductView[]  @relation("ProductViewUser")
+  pushTokens            PushToken[]
 }
 
 model Vendor {
@@ -106,6 +107,22 @@ model ProductView {
   @@unique([productId, viewerKey])
   @@index([productId])
   @@index([viewerUserId])
+}
+
+model PushToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique
+  platform  String?
+  deviceId  String?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([enabled])
 }
 
 model Conversation {
