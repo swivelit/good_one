@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.goodone.marketplace",
+      "sha256_cert_fingerprints": [
+        "97:05:CF:A7:05:38:70:DA:54:79:85:D8:84:23:69:CC:4F:8F:40:77:12:51:8D:15:59:26:BF:77:5C:A8:FF:E4"
+      ]
+    }
+  }
+]

@@ -35,6 +35,31 @@ The current Capacitor app id and Android package are `com.goodone.marketplace`. 
 
 Android push notifications require `client/android/app/google-services.json` from Firebase for package `com.goodone.marketplace`. Without that file and backend Firebase credentials, the app and server still build and run, but real device push notifications cannot be delivered.
 
+### Android App Links
+
+Product and vendor sharing must stay on normal HTTPS URLs, for example `https://good-one-jlcu.onrender.com/products/<id>` and `https://good-one-jlcu.onrender.com/vendors/<id>`. Android App Links let those same HTTPS links open the installed GoodOne Android app; when the app is not installed, the website fallback is expected.
+
+The Digital Asset Links file is committed at `client/public/.well-known/assetlinks.json` and must be publicly available after frontend deploy at:
+
+```sh
+https://good-one-jlcu.onrender.com/.well-known/assetlinks.json
+```
+
+For Play Store builds, use the Play App Signing SHA-256 fingerprint from Play Console, not only the local upload key fingerprint. SHA-256 certificate fingerprints are public identifiers, not secrets. Validate the committed file with:
+
+```sh
+cd client
+npm run app-links:validate
+```
+
+After deploying the frontend, verify the URL returns JSON and not the React `index.html` fallback:
+
+```sh
+curl -i https://good-one-jlcu.onrender.com/.well-known/assetlinks.json
+```
+
+Existing Play Store users need an app update containing the AndroidManifest App Link intent filters before shared product and vendor links can open the installed app.
+
 Public policy routes are available without login:
 
 - `/privacy`

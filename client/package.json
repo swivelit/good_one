@@ -28,6 +28,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "app-links:validate": "node scripts/validate-assetlinks.js",
     "build:android:apk": "bash ../scripts/build-android-apk.sh",
     "build:android:release:apk": "bash ../scripts/build-android_release-apk.sh",
     "build:ios:simulator": "bash ../scripts/build-ios-simulator.sh",

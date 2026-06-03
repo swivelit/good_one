@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './AuthContext';
 import AdMobDebugPanel from './components/AdMobDebugPanel';
 import AppVideoManager from './components/AppVideoManager';
+import AppLinkListener from './components/AppLinkListener';
 import ForceUpdateGate from './components/ForceUpdateGate';
 import NativeBackButtonHandler from './components/NativeBackButtonHandler';
 import PushNotificationManager from './components/PushNotificationManager';
@@ -125,6 +126,7 @@ export default function App() {
         <ForceUpdateGate />
         <NativeBackButtonHandler />
         <PushNotificationManager />
+        <AppLinkListener />
         <AppRoutes />
       </Router>
     </AuthProvider>
