@@ -4,6 +4,7 @@ import { vendorAPI } from '../api';
 import ProductCard from '../productCard';
 import toast from 'react-hot-toast';
 import { shareVendor } from '../services/share';
+import { attemptOpenInApp, canOpenInApp } from '../services/openInApp';
 
 export default function VendorProfile() {
   const { id } = useParams();
@@ -17,6 +18,14 @@ export default function VendorProfile() {
       .catch(() => toast.error('Vendor not found'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // On Android web (e.g. a link tapped inside WhatsApp's in-app browser) try to
+  // hand off to the installed app. No-op on native and on non-Android web.
+  useEffect(() => {
+    attemptOpenInApp(`/vendors/${id}`);
+  }, [id]);
+
+  const showOpenInApp = canOpenInApp();
 
   if (loading) return <div className="container py-5 text-center"><div className="spinner-border text-warning"></div></div>;
   if (!vendor) return <div className="container py-5 text-center"><h4>Vendor not found</h4></div>;
@@ -40,6 +49,16 @@ export default function VendorProfile() {
             </div>
           </div>
           <div className="ms-auto d-flex gap-2 flex-wrap">
+            {showOpenInApp && (
+              <button
+                type="button"
+                className="btn btn-warning btn-sm fw-semibold"
+                onClick={() => attemptOpenInApp(`/vendors/${id}`, { force: true })}
+              >
+                <i className="bi bi-phone me-1"></i>
+                Open in app
+              </button>
+            )}
             <button
               type="button"
               className="btn btn-light btn-sm fw-semibold"

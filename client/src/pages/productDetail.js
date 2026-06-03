@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { getUploadUrl } from "../config";
 import { isSafeInternalPath } from "../components/NativeBackButtonHandler";
 import { shareProduct } from "../services/share";
+import { attemptOpenInApp, canOpenInApp } from "../services/openInApp";
 
 function getTimeLeft(expiresAt) {
   const diff = new Date(expiresAt) - new Date();
@@ -40,6 +41,12 @@ export default function ProductDetail() {
       .then(({ data }) => setProduct(data.product))
       .catch(() => toast.error("Product not found"))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  // On Android web (e.g. a link tapped inside WhatsApp's in-app browser) try to
+  // hand off to the installed app. No-op on native and on non-Android web.
+  useEffect(() => {
+    attemptOpenInApp(`/products/${id}`);
   }, [id]);
 
 
@@ -121,6 +128,7 @@ export default function ProductDetail() {
     );
 
   const timer = getTimeLeft(product.expiresAt);
+  const showOpenInApp = canOpenInApp();
 
   const imgs = product?.images?.length
     ? product.images.map((i) => getUploadUrl(i))
@@ -233,6 +241,16 @@ export default function ProductDetail() {
             </span>
           </div>
 
+          {showOpenInApp && (
+            <button
+              type="button"
+              className="btn btn-warning btn-lg w-100 mb-3 fw-semibold"
+              onClick={() => attemptOpenInApp(`/products/${id}`, { force: true })}
+            >
+              <i className="bi bi-phone me-2"></i>
+              Open in the GoodOne app
+            </button>
+          )}
           <button
             className="btn btn-primary-custom btn-lg w-100 mb-3"
             onClick={handleChat}

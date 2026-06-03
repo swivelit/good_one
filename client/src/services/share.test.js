@@ -82,7 +82,8 @@ test('buildProductShareData includes title, price, and public product URL', () =
   });
   expect(shareData.text).toContain('Desk lamp');
   expect(shareData.text).toContain('Price: ₹1,499');
-  expect(shareData.text).toContain('https://good-one-jlcu.onrender.com/products/product-1');
+  // The URL is delivered via the `url` field only, never inside `text`.
+  expect(shareData.text).not.toContain('https://good-one-jlcu.onrender.com/products/product-1');
 });
 
 test('buildVendorShareData includes business name and public vendor URL', () => {
@@ -97,7 +98,30 @@ test('buildVendorShareData includes business name and public vendor URL', () => 
     dialogTitle: 'Share vendor profile',
   });
   expect(shareData.text).toContain('Fresh Finds on GoodOne');
-  expect(shareData.text).toContain('https://good-one-jlcu.onrender.com/vendors/vendor-1');
+  // The URL is delivered via the `url` field only, never inside `text`.
+  expect(shareData.text).not.toContain('https://good-one-jlcu.onrender.com/vendors/vendor-1');
+});
+
+test('product share data carries the URL exactly once (no duplicate link in WhatsApp)', () => {
+  const shareData = buildProductShareData({ _id: 'product-1', title: 'Desk lamp', price: 1499 });
+
+  // `text` must not contain the URL; the link only lives in `url`.
+  expect(shareData.url).toBe('https://good-one-jlcu.onrender.com/products/product-1');
+  expect(shareData.text).not.toContain(shareData.url);
+
+  // A share target that joins text + url sees the link a single time.
+  const combined = `${shareData.text}\n${shareData.url}`;
+  expect(combined.match(/good-one-jlcu\.onrender\.com\/products\/product-1/g)).toHaveLength(1);
+});
+
+test('vendor share data carries the URL exactly once (no duplicate link in WhatsApp)', () => {
+  const shareData = buildVendorShareData({ id: 'vendor-1', businessName: 'Fresh Finds' });
+
+  expect(shareData.url).toBe('https://good-one-jlcu.onrender.com/vendors/vendor-1');
+  expect(shareData.text).not.toContain(shareData.url);
+
+  const combined = `${shareData.text}\n${shareData.url}`;
+  expect(combined.match(/good-one-jlcu\.onrender\.com\/vendors\/vendor-1/g)).toHaveLength(1);
 });
 
 test('sharePayload uses Capacitor Share on native platforms', async () => {

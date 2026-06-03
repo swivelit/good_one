@@ -37,7 +37,9 @@ export const buildProductShareData = (product) => {
   const url = buildPublicUrl(`/products/${id}`);
   const title = product?.title ? `GoodOne: ${product.title}` : 'GoodOne product';
   const price = formatPrice(product?.price);
-  const text = [product?.title || 'GoodOne product', price && `Price: ${price}`, url]
+  // The URL is passed separately via `url`; keep it out of `text` so share
+  // targets like WhatsApp don't render the link twice.
+  const text = [product?.title || 'GoodOne product', price && `Price: ${price}`]
     .filter(Boolean)
     .join('\n');
 
@@ -54,9 +56,11 @@ export const buildVendorShareData = (vendor) => {
   const businessName = vendor?.businessName || 'GoodOne vendor';
   const url = buildPublicUrl(`/vendors/${id}`);
 
+  // The URL is passed separately via `url`; keep it out of `text` so share
+  // targets like WhatsApp don't render the link twice.
   return {
     title: businessName,
-    text: [`${businessName} on GoodOne`, url].join('\n'),
+    text: `${businessName} on GoodOne`,
     url,
     dialogTitle: 'Share vendor profile',
   };
