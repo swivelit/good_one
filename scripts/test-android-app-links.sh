@@ -17,6 +17,8 @@ PRODUCT_JSON_PATH="dist/android-app-links-product.json"
 LIVE_HEADERS_PATH="dist/live-assetlinks-headers.txt"
 LIVE_ASSETLINKS_PATH="dist/live-assetlinks.json"
 REPO_ASSETLINKS_PATH="client/public/.well-known/assetlinks.json"
+APP_LINK_VERIFY_TIMEOUT_SECONDS="${APP_LINK_VERIFY_TIMEOUT_SECONDS:-180}"
+APP_LINK_VERIFY_POLL_SECONDS="${APP_LINK_VERIFY_POLL_SECONDS:-10}"
 
 mkdir -p dist "$(dirname "$LOG_PATH")"
 
@@ -277,6 +279,120 @@ fail_with_diagnostics() {
   exit "$exit_code"
 }
 
+print_manual_recovery_instructions() {
+  cat <<'EOF'
+
+Manual Android App Links recovery:
+  Android Settings -> Apps -> GoodOne -> Open by default -> Open supported links ON -> enable good-one-jlcu.onrender.com.
+
+If the domain remains disabled or opens Chrome after the live assetlinks.json is valid, uninstall and reinstall the app:
+  adb uninstall com.goodone.marketplace
+  SHARED_PRODUCT_URL="https://good-one-jlcu.onrender.com/products/8522bf8f-9dfc-41f6-b696-805ffc58ebe5" ./launch-debug_apk.sh
+EOF
+}
+
+check_app_links_verified_state() {
+  node - "$STATE_PATH" "$HOST" <<'NODE'
+const fs = require('fs');
+
+const [statePath, host] = process.argv.slice(2);
+const text = fs.existsSync(statePath) ? fs.readFileSync(statePath, 'utf8') : '';
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const hostPattern = escapeRegExp(host);
+const stateMatch = text.match(new RegExp(`^\\s*${hostPattern}:\\s*([^\\r\\n]+)`, 'm'));
+const state = (stateMatch?.[1] || '').trim();
+const disabled = new RegExp(`Selection state:[\\s\\S]*?Disabled:[\\s\\S]*?^\\s*${hostPattern}\\s*$`, 'm').test(text);
+const verified = /^(verified|approved)$/i.test(state);
+const hardFailure = /^(denied|legacy_failure)$/i.test(state);
+
+if (disabled) {
+  console.log(`disabled:${state || 'missing'}`);
+  process.exit(2);
+}
+
+if (verified) {
+  console.log(`verified:${state}`);
+  process.exit(0);
+}
+
+if (hardFailure) {
+  console.log(`failed:${state}`);
+  process.exit(3);
+}
+
+if (state === '1024') {
+  console.log('pending:1024');
+  process.exit(4);
+}
+
+console.log(`pending:${state || 'missing'}`);
+process.exit(4);
+NODE
+}
+
+wait_for_app_links_verified() {
+  echo ""
+  echo "Requesting Android App Links re-verification..."
+  adb_cmd shell pm set-app-links --package "$APP_ID" 0 all || true
+  adb_cmd shell pm verify-app-links --re-verify "$APP_ID" || true
+  # Mirror the manual "Open supported links ON" setting for this test device.
+  # If Android still reports the host under Disabled after this, the script
+  # fails below and prints manual recovery steps.
+  adb_cmd shell pm set-app-links-allowed --user cur --package "$APP_ID" true || true
+  adb_cmd shell pm set-app-links-user-selection --user cur --package "$APP_ID" true "$HOST" || true
+
+  local deadline=$((SECONDS + APP_LINK_VERIFY_TIMEOUT_SECONDS))
+  local status_output
+  local status_code
+  local user_selection_recovery_attempted="false"
+
+  while true; do
+    adb_cmd shell pm get-app-links --user cur "$APP_ID" | tee "$STATE_PATH" || true
+
+    set +e
+    status_output="$(check_app_links_verified_state)"
+    status_code=$?
+    set -e
+
+    echo "Parsed App Links verification state for $HOST: $status_output"
+
+    if [ "$status_code" -eq 0 ]; then
+      return 0
+    fi
+
+    if [ "$status_code" -eq 2 ] &&
+      [ "$user_selection_recovery_attempted" = "false" ] &&
+      [[ "$status_output" =~ ^disabled:(verified|approved)$ ]]; then
+      echo "Android verified $HOST but user selection is disabled; enabling the host once and re-checking."
+      adb_cmd shell pm set-app-links-allowed --user cur --package "$APP_ID" true || true
+      adb_cmd shell pm set-app-links-user-selection --user cur --package "$APP_ID" true "$HOST" || true
+      user_selection_recovery_attempted="true"
+      sleep 2
+      continue
+    fi
+
+    if [ "$status_code" -eq 2 ]; then
+      echo "ERROR: Android user selection has disabled $HOST for $APP_ID."
+      print_manual_recovery_instructions
+      return 2
+    fi
+
+    if [ "$status_code" -eq 3 ]; then
+      echo "ERROR: Android reported App Links verification failure for $HOST: $status_output"
+      print_manual_recovery_instructions
+      return 3
+    fi
+
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      echo "ERROR: timed out waiting ${APP_LINK_VERIFY_TIMEOUT_SECONDS}s for $HOST to become verified or approved."
+      print_manual_recovery_instructions
+      return 4
+    fi
+
+    sleep "$APP_LINK_VERIFY_POLL_SECONDS"
+  done
+}
+
 echo "Testing Android App Links on adb device $DEVICE_ID"
 echo "APP_ID=$APP_ID"
 echo "WEB_ORIGIN=$WEB_ORIGIN"
@@ -324,12 +440,10 @@ echo ""
 echo "Current Android App Links state:"
 adb_cmd shell pm get-app-links --user cur "$APP_ID" || true
 
-echo ""
-echo "Requesting Android App Links re-verification..."
-adb_cmd shell pm set-app-links --package "$APP_ID" 0 all || true
-adb_cmd shell pm verify-app-links --re-verify "$APP_ID" || true
-sleep 20
-adb_cmd shell pm get-app-links --user cur "$APP_ID" | tee "$STATE_PATH" || true
+if ! wait_for_app_links_verified; then
+  fail_with_diagnostics 2 "Android App Links did not verify or approve $HOST for $APP_ID"
+fi
+
 print_app_link_diagnostics
 
 echo ""

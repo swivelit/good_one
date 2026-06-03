@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ID="com.goodone.marketplace"
 APK_PATH="$ROOT_DIR/dist/goodone-debug.apk"
 LOG_PATH="$ROOT_DIR/dist/goodone-debug-logcat.txt"
+SHARED_PRODUCT_URL="${SHARED_PRODUCT_URL:-}"
 
 echo "Building GoodOne debug APK..."
 bash "$ROOT_DIR/scripts/build-android-apk.sh"
@@ -45,5 +46,10 @@ echo "Captured filtered logcat output at $LOG_PATH"
 
 if [ -x "$ROOT_DIR/scripts/test-android-app-links.sh" ]; then
   echo "Running Android App Links verification..."
-  "$ROOT_DIR/scripts/test-android-app-links.sh"
+  if [ -n "$SHARED_PRODUCT_URL" ]; then
+    echo "Testing shared product URL: $SHARED_PRODUCT_URL"
+  else
+    echo "Testing shared product URL: (not provided; script will use live-product fallback)"
+  fi
+  SHARED_PRODUCT_URL="$SHARED_PRODUCT_URL" "$ROOT_DIR/scripts/test-android-app-links.sh"
 fi
