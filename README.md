@@ -58,7 +58,23 @@ After deploying the frontend, verify the URL returns JSON and not the React `ind
 curl -i https://good-one-jlcu.onrender.com/.well-known/assetlinks.json
 ```
 
+If that URL returns `text/html` or the React app shell, deploy the current frontend build and make sure the static `.well-known/assetlinks.json` file is served before the catch-all `/* -> /index.html` rewrite. Android cannot verify the domain while this URL returns `index.html`.
+
 Existing Play Store users need an app update containing the AndroidManifest App Link intent filters before shared product and vendor links can open the installed app.
+
+For local debug APK testing, Android automatic verification also needs the debug APK signing fingerprint in the live `assetlinks.json`, or the test device needs the domain manually approved. The production file should include the Play App Signing fingerprint for Play builds; do not guess it.
+
+Run the local Android App Links check after installing a debug APK:
+
+```sh
+scripts/test-android-app-links.sh
+```
+
+### iOS Universal Links
+
+iOS Universal Links are not fully configured yet. `client/ios/App/App/AppDelegate.swift` already forwards `continue userActivity` to Capacitor, but the repo currently has no active `client/public/.well-known/apple-app-site-association` file and no active `client/ios/App/App/App.entitlements` file.
+
+Templates are included at `client/public/.well-known/apple-app-site-association.example.json` and `client/ios/App/App/App.entitlements.example`. To enable iOS Universal Links, replace `TEAM_ID` with the Apple Developer Team ID, publish the AASA file without a `.json` extension at `https://good-one-jlcu.onrender.com/.well-known/apple-app-site-association`, and enable the Associated Domains entitlement in the signed iOS target.
 
 Public policy routes are available without login:
 

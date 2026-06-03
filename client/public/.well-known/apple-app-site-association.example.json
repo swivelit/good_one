@@ -1,0 +1,20 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": [
+          "TEAM_ID.com.goodone.marketplace"
+        ],
+        "components": [
+          {
+            "/": "/products/*"
+          },
+          {
+            "/": "/vendors/*"
+          }
+        ]
+      }
+    ]
+  }
+}

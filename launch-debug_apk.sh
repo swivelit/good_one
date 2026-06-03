@@ -42,3 +42,8 @@ adb -s "$DEVICE_ID" logcat -d -v time \
   > "$LOG_PATH" || true
 
 echo "Captured filtered logcat output at $LOG_PATH"
+
+if [ -x "$ROOT_DIR/scripts/test-android-app-links.sh" ]; then
+  echo "Running Android App Links verification..."
+  "$ROOT_DIR/scripts/test-android-app-links.sh"
+fi
