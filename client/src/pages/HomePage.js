@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { productAPI, statsAPI } from "../api";
 import ProductCard from "../productCard";
 import toast from "react-hot-toast";
@@ -30,6 +31,7 @@ const EMPTY_STATS = {
 
 export default function HomePage() {
   const { user } = useAuth();
+  const isNative = Capacitor.isNativePlatform();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const search = (searchParams.get("search") || "").trim();
@@ -143,8 +145,20 @@ export default function HomePage() {
 
   return (
     <>
-      {/* Hero */}
-      <section className="hero-section">
+      {/* Hero — full marketing hero on web; compact header on native so products come first */}
+      {isNative ? (
+        <section className="native-home-header bg-white border-bottom py-3">
+          <div className="container">
+            <h1 className="h5 fw-bold mb-1" style={{ color: "#2C3E50" }}>
+              Fresh listings near you
+            </h1>
+            <p className="text-muted small mb-0">
+              Browse 24-hour listings from registered vendors.
+            </p>
+          </div>
+        </section>
+      ) : (
+        <section className="hero-section">
         <div className="container position-relative" style={{ zIndex: 1 }}>
           <div className="row align-items-center">
             <div className="col-lg-7 text-white">
@@ -248,6 +262,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Stats Bar */}
       <section className="bg-white shadow-sm py-3">

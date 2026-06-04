@@ -15,7 +15,8 @@ export default function Navbar() {
   const logoutPath = isNative ? "/" : "/login";
   const showNativeSearch =
     isNative &&
-    ["/browse", "/products"].some((path) => location.pathname.startsWith(path));
+    (location.pathname === "/" ||
+      ["/browse", "/products"].some((path) => location.pathname.startsWith(path)));
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
