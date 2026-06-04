@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { NATIVE_BACK_DISMISS_EVENT } from "../services/nativeBackDismiss";
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const MAX_SCALE = 4;
@@ -27,6 +28,19 @@ export default function ImageLightbox({
   const [current, setCurrent] = useState(index);
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
   const [gesturing, setGesturing] = useState(false);
+
+  useEffect(() => {
+    const onNativeBackDismiss = (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation?.();
+      onClose();
+    };
+
+    window.addEventListener(NATIVE_BACK_DISMISS_EVENT, onNativeBackDismiss);
+    return () => {
+      window.removeEventListener(NATIVE_BACK_DISMISS_EVENT, onNativeBackDismiss);
+    };
+  }, [onClose]);
 
   // transformRef mirrors state so native handlers always read the latest value.
   const apply = useCallback((next) => {

@@ -1080,6 +1080,7 @@ body.goodone-admob-banner-active .native-bottom-nav {
   background: rgba(0, 0, 0, 0.92);
   /* We drive all panning/zooming in JS, so the WebView must not pan/zoom itself. */
   touch-action: none;
+  overscroll-behavior: contain;
   -webkit-user-select: none;
   user-select: none;
   padding-top: env(safe-area-inset-top, 0px);

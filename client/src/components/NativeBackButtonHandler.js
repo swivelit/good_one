@@ -3,6 +3,7 @@ import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { requestTopOverlayDismiss } from '../services/nativeBackDismiss';
 
 const ROOT_PATHS = new Set(['/', '/browse', '/dashboard']);
 
@@ -86,6 +87,8 @@ export default function NativeBackButtonHandler() {
     let cleanupRequested = false;
 
     const handleBackButton = (event = {}) => {
+      if (requestTopOverlayDismiss()) return;
+
       const currentLocation = locationRef.current;
       const target = getNativeBackTarget({
         pathname: currentLocation.pathname,
