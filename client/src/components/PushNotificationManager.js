@@ -22,13 +22,17 @@ export default function PushNotificationManager() {
     let cleanup = null;
     let cancelled = false;
 
-    initializePushNotifications({ navigate }).then((removeListeners) => {
-      if (cancelled) {
-        removeListeners?.();
-        return;
-      }
-      cleanup = removeListeners;
-    });
+    initializePushNotifications({ navigate })
+      .then((removeListeners) => {
+        if (cancelled) {
+          removeListeners?.();
+          return;
+        }
+        cleanup = removeListeners;
+      })
+      .catch((error) => {
+        console.warn('Push notification startup failed', error);
+      });
 
     return () => {
       cancelled = true;

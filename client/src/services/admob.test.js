@@ -58,6 +58,10 @@ const ENV_KEYS = [
   'REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID',
   'REACT_APP_ADMOB_ANDROID_REWARDED_ID',
   'REACT_APP_ADMOB_ANDROID_APP_OPEN_ID',
+  'REACT_APP_ADMOB_IOS_BANNER_ID',
+  'REACT_APP_ADMOB_IOS_INTERSTITIAL_ID',
+  'REACT_APP_ADMOB_IOS_REWARDED_ID',
+  'REACT_APP_ADMOB_IOS_APP_OPEN_ID',
   'REACT_APP_ADMOB_PRODUCT_DETAIL_INTERSTITIAL_INTERVAL',
   'REACT_APP_ADMOB_TEST_DEVICE_IDS',
 ];
@@ -107,6 +111,24 @@ test('test mode uses Google demo IDs for supported formats', () => {
   });
 });
 
+test('iOS test mode uses Google demo iOS ad unit IDs', () => {
+  process.env.NODE_ENV = 'production';
+  process.env.REACT_APP_USE_ADMOB_TEST_ADS = 'true';
+
+  expect(isUsingAdMobTestAds()).toBe(true);
+  expect(getAdMobAdUnitConfig(ADMOB_FORMATS.BANNER, 'ios')).toMatchObject({
+    adId: 'ca-app-pub-3940256099942544/2934735716',
+    configured: true,
+    platform: 'ios',
+    source: 'google-demo',
+    useTestAds: true,
+  });
+  expect(getAdMobAdUnitConfig(ADMOB_FORMATS.INTERSTITIAL, 'ios')).toMatchObject({
+    adId: 'ca-app-pub-3940256099942544/4411468910',
+    configured: true,
+  });
+});
+
 test('production mode requires env production IDs', () => {
   process.env.NODE_ENV = 'production';
   process.env.REACT_APP_USE_ADMOB_TEST_ADS = 'false';
@@ -121,6 +143,33 @@ test('production mode requires env production IDs', () => {
     useTestAds: false,
   });
   expect(getAdMobAdUnitConfig(ADMOB_FORMATS.INTERSTITIAL)).toMatchObject({
+    adId: '',
+    configured: false,
+    source: 'env-production',
+    useTestAds: false,
+  });
+});
+
+test('iOS production mode uses iOS env production IDs when present', () => {
+  process.env.NODE_ENV = 'production';
+  process.env.REACT_APP_USE_ADMOB_TEST_ADS = 'false';
+  process.env.REACT_APP_ADMOB_IOS_BANNER_ID = 'ca-app-pub-1111222233334444/5555666677';
+  process.env.REACT_APP_ADMOB_IOS_INTERSTITIAL_ID = 'ca-app-pub-1111222233334444/8888999900';
+  delete process.env.REACT_APP_ADMOB_IOS_REWARDED_ID;
+
+  expect(isUsingAdMobTestAds()).toBe(false);
+  expect(getAdMobAdUnitConfig(ADMOB_FORMATS.BANNER, 'ios')).toMatchObject({
+    adId: 'ca-app-pub-1111222233334444/5555666677',
+    configured: true,
+    platform: 'ios',
+    source: 'env-production',
+    useTestAds: false,
+  });
+  expect(getAdMobAdUnitConfig(ADMOB_FORMATS.INTERSTITIAL, 'ios')).toMatchObject({
+    adId: 'ca-app-pub-1111222233334444/8888999900',
+    configured: true,
+  });
+  expect(getAdMobAdUnitConfig(ADMOB_FORMATS.REWARDED, 'ios')).toMatchObject({
     adId: '',
     configured: false,
     source: 'env-production',

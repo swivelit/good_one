@@ -13,8 +13,10 @@ IOS_SCHEME="${IOS_SCHEME:-App}"
 IOS_CONFIGURATION="${IOS_CONFIGURATION:-Release}"
 IOS_DESTINATION="${IOS_DESTINATION:-generic/platform=iOS}"
 IOS_TEAM_ID="${IOS_TEAM_ID:-}"
+IOS_ALLOW_LOCAL_SIGNING="${IOS_ALLOW_LOCAL_SIGNING:-false}"
 IOS_BUNDLE_ID="${IOS_BUNDLE_ID:-}"
 IOS_EXPORT_OPTIONS_PLIST="${IOS_EXPORT_OPTIONS_PLIST:-}"
+GENERATE_SOURCEMAP="${GENERATE_SOURCEMAP:-false}"
 
 cat <<'BANNER'
 ========================================
@@ -44,8 +46,46 @@ if ! command -v xcodebuild >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! xcodebuild -version >/dev/null 2>&1; then
+  echo "ERROR: xcodebuild is installed but Xcode is not ready. Open Xcode, accept the license, and run first launch setup."
+  exit 1
+fi
+
 if ! command -v pod >/dev/null 2>&1; then
   echo "ERROR: CocoaPods not found. Install it with: sudo gem install cocoapods"
+  exit 1
+fi
+
+if [ -z "$IOS_TEAM_ID" ] && [ "$IOS_ALLOW_LOCAL_SIGNING" != "true" ]; then
+  cat <<'EOF'
+ERROR: IOS_TEAM_ID is not set, so a signed iOS archive cannot start.
+
+Archive and device distribution builds require Apple signing. The signing team
+must come from your environment or local Xcode configuration; do not commit Team
+IDs, certificates, provisioning profiles, private keys, or Apple account data.
+
+Use one of these paths:
+  Simulator verification, no signing required:
+    IOS_BUILD_MODE=simulator ./scripts/build-ios.sh
+
+  Local iPhone Debug testing:
+    Open client/ios/App/App.xcworkspace in Xcode, sign in with a free Apple
+    Account, select your Personal Team in Signing & Capabilities, then run:
+    IOS_BUILD_MODE=device ./scripts/build-ios.sh
+
+  TestFlight/App Store/archive distribution:
+    Join the Apple Developer Program, then run:
+    IOS_TEAM_ID=YOUR_TEAM_ID IOS_BUILD_MODE=archive ./scripts/build-ios.sh
+
+If this Mac already has local Xcode signing configured and you intentionally
+want xcodebuild to use it without passing IOS_TEAM_ID, rerun with:
+  IOS_ALLOW_LOCAL_SIGNING=true ./scripts/build-ios-archive.sh
+EOF
+  exit 1
+fi
+
+if [ -n "$IOS_EXPORT_OPTIONS_PLIST" ] && [ ! -f "$IOS_EXPORT_OPTIONS_PLIST" ]; then
+  echo "ERROR: IOS_EXPORT_OPTIONS_PLIST was set but file does not exist: $IOS_EXPORT_OPTIONS_PLIST"
   exit 1
 fi
 
@@ -73,7 +113,8 @@ fi
 echo ""
 echo "Building React app..."
 echo "REACT_APP_USE_ADMOB_TEST_ADS=$USE_ADMOB_TEST_ADS"
-REACT_APP_USE_ADMOB_TEST_ADS="$USE_ADMOB_TEST_ADS" npm run build
+echo "GENERATE_SOURCEMAP=$GENERATE_SOURCEMAP"
+GENERATE_SOURCEMAP="$GENERATE_SOURCEMAP" REACT_APP_USE_ADMOB_TEST_ADS="$USE_ADMOB_TEST_ADS" npm run build
 
 echo ""
 echo "Syncing Capacitor iOS..."
@@ -101,12 +142,7 @@ XCODEBUILD_ARGS=(
 if [ -n "$IOS_TEAM_ID" ]; then
   XCODEBUILD_ARGS+=(DEVELOPMENT_TEAM="$IOS_TEAM_ID" CODE_SIGN_STYLE=Automatic)
 else
-  echo "WARNING: IOS_TEAM_ID is not set."
-  echo "Signed iOS archive builds require an Apple signing team."
-  echo "App Store and TestFlight distribution require Apple Developer Program membership."
-  echo "If local Xcode signing is already configured, this archive may still work."
-  echo "For no-payment local iOS verification, run: ./scripts/build-ios-simulator.sh"
-  echo "Example signed archive: IOS_TEAM_ID=YOUR_TEAM_ID ./scripts/build-ios-archive.sh"
+  echo "IOS_ALLOW_LOCAL_SIGNING=true: using local Xcode signing settings for archive."
 fi
 
 if [ -n "$IOS_BUNDLE_ID" ]; then
@@ -125,11 +161,6 @@ $ARCHIVE_PATH
 EOF2
 
 if [ -n "$IOS_EXPORT_OPTIONS_PLIST" ]; then
-  if [ ! -f "$IOS_EXPORT_OPTIONS_PLIST" ]; then
-    echo "ERROR: IOS_EXPORT_OPTIONS_PLIST was set but file does not exist: $IOS_EXPORT_OPTIONS_PLIST"
-    exit 1
-  fi
-
   echo ""
   echo "Exporting IPA..."
   rm -rf "$IPA_EXPORT_DIR"

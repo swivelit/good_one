@@ -1,19 +1,31 @@
 PODS:
   - Capacitor (7.6.2):
     - CapacitorCordova
+  - CapacitorApp (7.1.2):
+    - Capacitor
   - CapacitorCommunityAdmob (7.2.0):
     - Capacitor
     - Google-Mobile-Ads-SDK (= 12.12.0)
     - GoogleUserMessagingPlatform (= 3.0.0)
   - CapacitorCordova (7.6.2)
+  - CapacitorLocalNotifications (7.0.6):
+    - Capacitor
+  - CapacitorPushNotifications (7.0.6):
+    - Capacitor
+  - CapacitorShare (7.0.4):
+    - Capacitor
   - Google-Mobile-Ads-SDK (12.12.0):
     - GoogleUserMessagingPlatform (>= 1.1)
   - GoogleUserMessagingPlatform (3.0.0)
 
 DEPENDENCIES:
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorApp (from `../../node_modules/@capacitor/app`)"
   - "CapacitorCommunityAdmob (from `../../node_modules/@capacitor-community/admob`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorLocalNotifications (from `../../node_modules/@capacitor/local-notifications`)"
+  - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
+  - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
 
 SPEC REPOS:
   trunk:
@@ -23,18 +35,30 @@ SPEC REPOS:
 EXTERNAL SOURCES:
   Capacitor:
     :path: "../../node_modules/@capacitor/ios"
+  CapacitorApp:
+    :path: "../../node_modules/@capacitor/app"
   CapacitorCommunityAdmob:
     :path: "../../node_modules/@capacitor-community/admob"
   CapacitorCordova:
     :path: "../../node_modules/@capacitor/ios"
+  CapacitorLocalNotifications:
+    :path: "../../node_modules/@capacitor/local-notifications"
+  CapacitorPushNotifications:
+    :path: "../../node_modules/@capacitor/push-notifications"
+  CapacitorShare:
+    :path: "../../node_modules/@capacitor/share"
 
 SPEC CHECKSUMS:
   Capacitor: 5d4e6523047feb0e4755e5e922ded0372c2dde24
+  CapacitorApp: f01a913211780e0718dae9750442c3e23f96e106
   CapacitorCommunityAdmob: 04498ca8d01a097aa7d9d80584094b6b3419ec3f
   CapacitorCordova: 8214697bed435f6e7c5e3ed86d1632a8c42f7d77
+  CapacitorLocalNotifications: 2e3f5b717ec9cd2bd64d93c99a9470941e1c80be
+  CapacitorPushNotifications: b8e30637549ce91468b8c4dddbef2657be831f4c
+  CapacitorShare: 25f7fc5dd0e4edbde5d6801c6de5d14a8b450a41
   Google-Mobile-Ads-SDK: 4dde70a8c18d96b14f9548759b8cec6ecb0bc3e6
   GoogleUserMessagingPlatform: f8d0cdad3ca835406755d0a69aa634f00e76d576
 
-PODFILE CHECKSUM: caafe999b2f90d5ad95240cafe9f54d5a01dd691
+PODFILE CHECKSUM: daf84e1b4b82360b649dc978504416260ad82063
 
 COCOAPODS: 1.16.2

@@ -1,53 +1,133 @@
 # iOS signing and build setup
 
-GoodOne supports two different iOS build paths:
+GoodOne has three separate iOS build paths. Keep them separate so local
+verification does not accidentally start a signed archive.
 
-- iOS Simulator Debug builds do not require Apple Developer Program payment, a Team ID, certificates, or provisioning profiles.
-- Signed iOS device/archive builds require Apple signing configured in Xcode or a developer-provided `IOS_TEAM_ID`.
-- TestFlight, App Store, and other release archive distribution require Apple Developer Program membership.
-- A free Apple Account with Xcode Personal Team can be used for limited personal device testing, but it is not enough for TestFlight or App Store distribution.
-- Team IDs are local signing configuration and must not be committed to git.
+- Simulator Debug builds do not require Apple Developer Program payment, a Team
+  ID, certificates, provisioning profiles, or code signing.
+- Physical iPhone Debug builds must be signed. A free Apple Account can use an
+  Xcode Personal Team for limited local device testing.
+- TestFlight, App Store, IPA export, and archive distribution require Apple
+  Developer Program membership and valid distribution signing.
 
-Keep the Xcode target on automatic signing unless you intentionally manage profiles yourself. The committed bundle identifier is `com.goodone.marketplace`.
+Do not commit Apple Team IDs, provisioning profiles, certificates, Apple private
+keys, `.p8` files, Xcode `xcuserdata`, or signing secrets. The committed bundle
+identifier is `com.goodone.marketplace`; use `IOS_BUNDLE_ID` only as a local
+override when a personal-device build needs a unique development identifier.
 
-## Simulator build without paid signing
+## Default build router
 
-Use this for local iOS build verification when you do not need a signed device build:
+From the repository root:
+
+```bash
+./scripts/build-ios.sh
+```
+
+Behavior:
+
+- `IOS_BUILD_MODE=simulator` runs `scripts/build-ios-simulator.sh`.
+- `IOS_BUILD_MODE=device` runs `scripts/run-ios-device.sh`.
+- `IOS_BUILD_MODE=archive` runs `scripts/build-ios-archive.sh`.
+- When `IOS_BUILD_MODE` is omitted and `IOS_TEAM_ID` is not set, the script
+  defaults to unsigned simulator verification.
+- When `IOS_BUILD_MODE` is omitted and `IOS_TEAM_ID` is set, the script preserves
+  the old signed archive behavior.
+
+## Simulator verification
+
+Use this for local iOS build verification without signing:
+
+```bash
+IOS_BUILD_MODE=simulator ./scripts/build-ios.sh
+```
+
+Equivalent npm command:
 
 ```bash
 cd client
 npm run build:ios:simulator
 ```
 
-The simulator script installs frontend dependencies unless `SKIP_NPM_CI=true`, builds the React app with `REACT_APP_USE_ADMOB_TEST_ADS=true` by default, syncs Capacitor iOS, installs pods, and runs an iOS Simulator Debug build with `CODE_SIGNING_ALLOWED=NO`.
+The simulator script installs frontend dependencies unless `SKIP_NPM_CI=true`,
+builds React with `REACT_APP_USE_ADMOB_TEST_ADS=true` by default, syncs
+Capacitor iOS, installs pods, and runs an iOS Simulator Debug build with
+`CODE_SIGNING_ALLOWED=NO`. It defaults `GENERATE_SOURCEMAP=false` to avoid noisy
+third-party source-map warnings; set `GENERATE_SOURCEMAP=true` if you need
+source maps for debugging.
 
-## Signed iOS archive
+## Physical iPhone Debug testing
 
-Use this only when a developer provides their own Apple Team ID:
+A physical iPhone cannot run an unsigned app. For local device testing, use a
+free Apple Account and Xcode Personal Team signing, or provide `IOS_TEAM_ID`
+from your environment:
 
 ```bash
-IOS_TEAM_ID=YOUR_TEAM_ID REACT_APP_USE_ADMOB_TEST_ADS=false ./scripts/build-ios-archive.sh
+IOS_BUILD_MODE=device ./scripts/build-ios.sh
+```
+
+Equivalent npm command:
+
+```bash
+cd client
+npm run run:ios:device
+```
+
+Optional device/debug overrides:
+
+```bash
+IOS_TEAM_ID=YOUR_TEAM_ID \
+IOS_DEVICE_ID=YOUR_DEVICE_ID \
+IOS_BUNDLE_ID=com.goodone.marketplace.dev.$USER \
+./scripts/run-ios-device.sh
+```
+
+To configure a Personal Team:
+
+1. Open `client/ios/App/App.xcworkspace` in Xcode.
+2. Select the `App` target.
+3. Open **Signing & Capabilities**.
+4. Sign in with a free Apple Account and select your Personal Team.
+5. Keep **Automatically manage signing** enabled.
+6. If Xcode says the production bundle identifier is unavailable, rerun the
+   script with a local `IOS_BUNDLE_ID` override.
+7. Do not commit any `DEVELOPMENT_TEAM` or provisioning changes from
+   `project.pbxproj`.
+
+Personal Team provisioning is limited and temporary. It is suitable for local
+device debugging, not TestFlight, App Store distribution, or production release
+signing.
+
+## Signed archive
+
+Use archives only for real signed distribution work:
+
+```bash
+IOS_TEAM_ID=YOUR_TEAM_ID \
+IOS_BUILD_MODE=archive \
+REACT_APP_USE_ADMOB_TEST_ADS=false \
+./scripts/build-ios.sh
 ```
 
 For local QA archives, keep test ads enabled:
 
 ```bash
-IOS_TEAM_ID=YOUR_TEAM_ID REACT_APP_USE_ADMOB_TEST_ADS=true ./scripts/build-ios-archive.sh
+IOS_TEAM_ID=YOUR_TEAM_ID \
+IOS_BUILD_MODE=archive \
+REACT_APP_USE_ADMOB_TEST_ADS=true \
+./scripts/build-ios.sh
 ```
 
-If `IOS_TEAM_ID` is omitted, the archive script will still run so local Xcode signing configuration can be used, but unsigned or unconfigured archive builds should be expected to fail. Do not hard-code the Team ID in `client/ios/App/App.xcodeproj/project.pbxproj`.
+If `IOS_TEAM_ID` is omitted, `scripts/build-ios-archive.sh` fails fast with a
+signing explanation before running `xcodebuild archive`. If this Mac already has
+local Xcode signing configured and you intentionally want the archive script to
+use it without passing `IOS_TEAM_ID`, opt in explicitly:
 
-## Xcode signing setup
+```bash
+IOS_ALLOW_LOCAL_SIGNING=true ./scripts/build-ios-archive.sh
+```
 
-On the Mac that will create a signed archive:
-
-1. Open `client/ios/App/App.xcworkspace` in Xcode.
-2. Select the `App` project, then the `App` target.
-3. Open **Signing & Capabilities**.
-4. Select your own Apple Developer Team or Personal Team.
-5. Keep **Automatically manage signing** enabled unless you already use manual profiles.
-6. Keep the bundle identifier as `com.goodone.marketplace` unless the production App Store Connect app uses a different identifier.
-7. Re-run the signed archive command.
+Do not hard-code the Team ID in
+`client/ios/App/App.xcodeproj/project.pbxproj`.
 
 ## Optional IPA export
 
@@ -59,4 +139,12 @@ IOS_EXPORT_OPTIONS_PLIST=/absolute/path/to/ExportOptions.plist \
 ./scripts/build-ios-archive.sh
 ```
 
-The IPA export folder will be `dist/ios/ipa`.
+The IPA export folder will be `dist/ios/ipa`. TestFlight and App Store exports
+require Apple Developer Program membership.
+
+## Capabilities
+
+The repo does not commit push notification or Associated Domains entitlements.
+Those capabilities require a signed iOS target, and some Apple capabilities may
+require paid Apple Developer Program membership. Configure them deliberately in
+Xcode for the signed target and keep generated signing data out of git.

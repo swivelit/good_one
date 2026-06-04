@@ -17,6 +17,8 @@ Replace `https://good-one-api.onrender.com` before production builds if the real
 
 React environment variables are public. `client/src/config.js` already falls back to `https://good-one-api.onrender.com` for production backend builds and `https://good-one-jlcu.onrender.com` for public share links when these values are not set.
 
+AdMob test ads stay enabled by default for local debug, simulator, and device testing with `REACT_APP_USE_ADMOB_TEST_ADS=true`. For approved production release builds only, set `REACT_APP_USE_ADMOB_TEST_ADS=false` and provide the platform-specific production unit IDs, for example `REACT_APP_ADMOB_ANDROID_BANNER_ID` and `REACT_APP_ADMOB_IOS_BANNER_ID`. Local test builds do not require production AdMob IDs.
+
 ## Render backend deployment
 
 - Root directory: `Backend`
@@ -29,7 +31,7 @@ React environment variables are public. `client/src/config.js` already falls bac
 
 ## Capacitor mobile apps
 
-Android already exists at `client/android` and Capacitor Android 7 requires JDK 21 for Gradle builds. If your terminal still uses Java 17, switch `JAVA_HOME` to a JDK 21 install before running Gradle. iOS is generated when needed. Simulator builds require macOS, Xcode 26 or newer, and CocoaPods, but do not require Apple Developer Program payment or signing. Signed iOS device/archive builds require Apple signing; TestFlight and App Store distribution require Apple Developer Program membership. Before iOS sync/build/archive, make sure `xcode-select` points to the full Xcode app and the Xcode license has been accepted.
+Android already exists at `client/android` and Capacitor Android 7 requires JDK 21 for Gradle builds. If your terminal still uses Java 17, switch `JAVA_HOME` to a JDK 21 install before running Gradle. iOS is generated when needed. Simulator builds require macOS, Xcode 26 or newer, and CocoaPods, but do not require Apple Developer Program payment or signing. Physical iPhone Debug builds require Xcode signing and can use a free Apple Account with a Personal Team for limited local testing. TestFlight, App Store, IPA export, and archive distribution require Apple Developer Program membership. Before iOS sync/build/archive, make sure `xcode-select` points to the full Xcode app and the Xcode license has been accepted.
 
 The current Capacitor app id and Android package are `com.goodone.marketplace`. Finalize this before the first Play Store or App Store upload. If it needs to change, update `client/capacitor.config.json`, `client/android/app/build.gradle`, `client/android/app/src/main/res/values/strings.xml`, and the Xcode target Bundle Identifier.
 
@@ -74,7 +76,7 @@ scripts/test-android-app-links.sh
 
 iOS Universal Links are not fully configured yet. `client/ios/App/App/AppDelegate.swift` already forwards `continue userActivity` to Capacitor, but the repo currently has no active `client/public/.well-known/apple-app-site-association` file and no active `client/ios/App/App/App.entitlements` file.
 
-Templates are included at `client/public/.well-known/apple-app-site-association.example.json` and `client/ios/App/App/App.entitlements.example`. To enable iOS Universal Links, replace `TEAM_ID` with the Apple Developer Team ID, publish the AASA file without a `.json` extension at `https://good-one-jlcu.onrender.com/.well-known/apple-app-site-association`, and enable the Associated Domains entitlement in the signed iOS target.
+Templates are included at `client/public/.well-known/apple-app-site-association.example.json` and `client/ios/App/App/App.entitlements.example`. To enable iOS Universal Links, replace `TEAM_ID` with the Apple Developer Team ID, publish the AASA file without a `.json` extension at `https://good-one-jlcu.onrender.com/.well-known/apple-app-site-association`, and enable the Associated Domains entitlement in the signed iOS target. Associated Domains and push notification entitlements require signing, and some Apple capabilities may require paid Apple Developer Program membership; do not commit generated signing data.
 
 Public policy routes are available without login:
 
@@ -139,17 +141,48 @@ iOS is currently `MARKETING_VERSION 1.0` and `CURRENT_PROJECT_VERSION 1`. Every 
 For local iOS build verification without Apple Developer Program payment or signing, use the simulator build:
 
 ```sh
+IOS_BUILD_MODE=simulator ./scripts/build-ios.sh
+```
+
+Equivalent npm command:
+
+```sh
 cd client
 npm run build:ios:simulator
 ```
 
+`./scripts/build-ios.sh` is a mode router:
+
+- `IOS_BUILD_MODE=simulator` runs unsigned simulator verification.
+- `IOS_BUILD_MODE=device` runs signed physical-device Debug build flow.
+- `IOS_BUILD_MODE=archive` runs signed archive flow.
+- If no mode and no `IOS_TEAM_ID` are set, it defaults to simulator verification.
+- If no mode is set but `IOS_TEAM_ID` is present, it preserves the existing archive behavior.
+
+For physical iPhone Debug testing, use Xcode signing. A free Apple Account with Xcode Personal Team can be used for limited local device testing, but Personal Team provisioning is limited and temporary:
+
+```sh
+IOS_BUILD_MODE=device ./scripts/build-ios.sh
+```
+
+Optional device/debug overrides:
+
+```sh
+IOS_TEAM_ID=YOUR_TEAM_ID \
+IOS_DEVICE_ID=YOUR_DEVICE_ID \
+IOS_BUNDLE_ID=com.goodone.marketplace.dev.$USER \
+./scripts/run-ios-device.sh
+```
+
+To configure Personal Team signing, open `client/ios/App/App.xcworkspace` in Xcode, select the `App` target, open **Signing & Capabilities**, sign in with a free Apple Account, select your Personal Team, and keep automatic signing enabled. Do not commit `DEVELOPMENT_TEAM` or provisioning changes from `project.pbxproj`.
+
 For signed release, TestFlight, or App Store archive builds, provide your own Apple Team ID from the repository root:
 
 ```sh
-IOS_TEAM_ID=YOUR_TEAM_ID REACT_APP_USE_ADMOB_TEST_ADS=false ./scripts/build-ios-archive.sh
+IOS_TEAM_ID=YOUR_TEAM_ID IOS_BUILD_MODE=archive REACT_APP_USE_ADMOB_TEST_ADS=false ./scripts/build-ios.sh
 ```
 
-Do not commit Apple Team IDs, certificates, provisioning profiles, private keys, or Apple accounts. Apple signing and Developer Program payment requirements are Apple platform requirements, not GoodOne code issues. A free Apple Account with Xcode Personal Team can be used for limited personal device testing, but not for TestFlight or App Store distribution.
+Do not commit Apple Team IDs, certificates, provisioning profiles, private keys, `.p8` files, Xcode `xcuserdata`, or Apple accounts. Apple signing and Developer Program payment requirements are Apple platform requirements, not GoodOne code issues. If `IOS_TEAM_ID` is missing, `scripts/build-ios-archive.sh` fails fast before `xcodebuild archive`; simulator verification remains available without signing.
 
 If this Mac is still pointed at Command Line Tools, run:
 
@@ -194,11 +227,12 @@ iOS:
 
 ```sh
 cd client
-npm run build:ios:simulator
+npm run build:ios
 ```
 
 - Local simulator verification uses no Apple Developer Program payment and no signing.
-- For TestFlight/App Store, run `IOS_TEAM_ID=YOUR_TEAM_ID REACT_APP_USE_ADMOB_TEST_ADS=false ./scripts/build-ios-archive.sh` from the repository root, then distribute the signed archive from Xcode.
+- Physical iPhone Debug testing requires Xcode signing with a free Apple Account Personal Team or `IOS_TEAM_ID`; run `IOS_BUILD_MODE=device ./scripts/build-ios.sh`.
+- For TestFlight/App Store, run `IOS_TEAM_ID=YOUR_TEAM_ID IOS_BUILD_MODE=archive REACT_APP_USE_ADMOB_TEST_ADS=false ./scripts/build-ios.sh` from the repository root, then distribute the signed archive from Xcode.
 
 Store submission checklist:
 

@@ -10,6 +10,7 @@ NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org/}"
 USE_ADMOB_TEST_ADS="${REACT_APP_USE_ADMOB_TEST_ADS:-true}"
 IOS_SCHEME="${IOS_SCHEME:-App}"
 IOS_SIMULATOR_DESTINATION="${IOS_SIMULATOR_DESTINATION:-generic/platform=iOS Simulator}"
+GENERATE_SOURCEMAP="${GENERATE_SOURCEMAP:-false}"
 
 cat <<'BANNER'
 ========================================
@@ -49,6 +50,16 @@ if ! command -v pod >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v npm >/dev/null 2>&1; then
+  echo "ERROR: npm not found. Install Node.js and npm, then rerun this script."
+  exit 1
+fi
+
+if ! command -v npx >/dev/null 2>&1; then
+  echo "ERROR: npx not found. Install Node.js/npm, then rerun this script."
+  exit 1
+fi
+
 echo ""
 echo "Xcode:"
 xcodebuild -version
@@ -66,7 +77,8 @@ fi
 echo ""
 echo "Building React app..."
 echo "REACT_APP_USE_ADMOB_TEST_ADS=$USE_ADMOB_TEST_ADS"
-REACT_APP_USE_ADMOB_TEST_ADS="$USE_ADMOB_TEST_ADS" npm run build
+echo "GENERATE_SOURCEMAP=$GENERATE_SOURCEMAP"
+GENERATE_SOURCEMAP="$GENERATE_SOURCEMAP" REACT_APP_USE_ADMOB_TEST_ADS="$USE_ADMOB_TEST_ADS" npm run build
 
 echo ""
 echo "Syncing Capacitor iOS..."
