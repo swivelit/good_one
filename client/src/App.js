@@ -12,7 +12,6 @@ import PushNotificationManager from './components/PushNotificationManager';
 import Navbar from './Navbar';
 import Footer from './footer';
 import HomePage from './pages/HomePage';
-import MobileWelcomePage from './pages/MobileWelcomePage';
 import LoginPage from './pages/loginpage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import RegisterCustomer from './pages/RegisterConstomerpage';
@@ -48,9 +47,10 @@ const NativeStartRoute = () => {
   const { user, loading } = useAuth();
 
   if (loading) return <div className="d-flex justify-content-center align-items-center" style={{minHeight:'60vh'}}><div className="spinner-border text-warning" /></div>;
-  if (!Capacitor.isNativePlatform()) return <HomePage />;
-  if (!user) return <MobileWelcomePage />;
-  if (user.role === "vendor") return <Navigate to="/dashboard" replace />;
+  // Native vendors go straight to their dashboard; everyone else — including
+  // unauthenticated native users — lands on the browsing page. (Sign In stays
+  // reachable from the Navbar.) On web this always falls through to HomePage.
+  if (Capacitor.isNativePlatform() && user?.role === "vendor") return <Navigate to="/dashboard" replace />;
   return <HomePage />;
 };
 
@@ -59,10 +59,13 @@ function AppRoutes() {
   const location = useLocation();
   const previousPathRef = useRef(location.pathname);
   const isNative = Capacitor.isNativePlatform();
+  // Landing page ("/") now shows HomePage for logged-out native users, so the
+  // Navbar must stay visible there (it's where Sign In lives). Chrome is still
+  // hidden on the dedicated full-screen auth flows.
   const hideNativeAuthChrome =
     isNative &&
     !user &&
-    ["/", "/login", "/forgot-password", "/register/customer", "/register/vendor"].includes(location.pathname);
+    ["/login", "/forgot-password", "/register/customer", "/register/vendor"].includes(location.pathname);
 
   useEffect(() => {
     const previousPath = previousPathRef.current;

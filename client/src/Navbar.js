@@ -9,6 +9,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [search, setSearch] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
   const isNative = Capacitor.isNativePlatform();
   const browsePath = "/browse";
   const logoutPath = isNative ? "/" : "/login";
@@ -17,8 +18,9 @@ export default function Navbar() {
     ["/browse", "/products"].some((path) => location.pathname.startsWith(path));
 
   useEffect(() => {
-    const currentSearch = new URLSearchParams(location.search).get("search") || "";
-    setSearch(currentSearch);
+    const params = new URLSearchParams(location.search);
+    setSearch(params.get("search") || "");
+    setLocationQuery(params.get("location") || "");
   }, [location.search]);
 
   const handleLogout = () => {
@@ -27,14 +29,21 @@ export default function Navbar() {
     navigate(logoutPath);
   };
 
+  const buildSearchUrl = (nextSearch, nextLocation) => {
+    const params = new URLSearchParams();
+    const trimmedSearch = String(nextSearch || "").trim();
+    const trimmedLocation = String(nextLocation || "").trim();
+
+    if (trimmedSearch) params.set("search", trimmedSearch);
+    if (trimmedLocation) params.set("location", trimmedLocation);
+
+    const query = params.toString();
+    return query ? `${browsePath}?${query}` : browsePath;
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
-
-    if (search.trim()) {
-      navigate(`${browsePath}?search=${encodeURIComponent(search.trim())}`);
-    } else {
-      navigate(browsePath);
-    }
+    navigate(buildSearchUrl(search, locationQuery));
   };
 
   const handleSearchChange = (e) => {
@@ -42,7 +51,16 @@ export default function Navbar() {
     setSearch(nextSearch);
 
     if (!nextSearch.trim() && new URLSearchParams(location.search).has("search")) {
-      navigate(browsePath);
+      navigate(buildSearchUrl("", locationQuery));
+    }
+  };
+
+  const handleLocationChange = (e) => {
+    const nextLocation = e.target.value;
+    setLocationQuery(nextLocation);
+
+    if (!nextLocation.trim() && new URLSearchParams(location.search).has("location")) {
+      navigate(buildSearchUrl(search, ""));
     }
   };
 
@@ -102,6 +120,17 @@ export default function Navbar() {
                 placeholder="Search products"
                 value={search}
                 onChange={handleSearchChange}
+              />
+              <span
+                aria-hidden="true"
+                style={{ width: 1, alignSelf: "stretch", background: "#d8dee3" }}
+              ></span>
+              <i className="bi bi-geo-alt"></i>
+              <input
+                type="search"
+                placeholder="Location"
+                value={locationQuery}
+                onChange={handleLocationChange}
               />
             </form>
           )}
@@ -168,7 +197,7 @@ export default function Navbar() {
 
           <form
             className="d-flex mx-auto my-2 my-lg-0"
-            style={{ maxWidth: "380px", width: "100%" }}
+            style={{ maxWidth: "520px", width: "100%" }}
             onSubmit={handleSearch}
           >
             <div className="input-group">
@@ -179,6 +208,18 @@ export default function Navbar() {
                 value={search}
                 onChange={handleSearchChange}
                 style={{ borderRadius: "10px 0 0 10px" }}
+              />
+
+              <span className="input-group-text bg-white border-start-0 border-end-0 px-2 text-muted">
+                <i className="bi bi-geo-alt"></i>
+              </span>
+              <input
+                className="form-control border-start-0"
+                type="search"
+                placeholder="Location"
+                value={locationQuery}
+                onChange={handleLocationChange}
+                style={{ maxWidth: 150 }}
               />
 
               <button

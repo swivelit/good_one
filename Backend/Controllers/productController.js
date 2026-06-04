@@ -115,7 +115,7 @@ const validateProductPricing = (body) => {
 
 exports.getProducts = async (req, res) => {
   try {
-    const { category, search, page = 1, limit = 12 } = req.query;
+    const { category, search, location, page = 1, limit = 12 } = req.query;
     const pageNumber = Math.max(parseInt(page, 10) || 1, 1);
     const pageSize = Math.max(parseInt(limit, 10) || 12, 1);
 
@@ -131,6 +131,13 @@ exports.getProducts = async (req, res) => {
       normalizedCategory.toLowerCase() !== 'all'
     ) {
       where.category = normalizedCategory;
+    }
+
+    // Separate AND condition: keyword search and location filter are independent,
+    // so results match (keyword OR block) AND (location contains the filter).
+    const normalizedLocation = normalizeSearchTerm(location);
+    if (normalizedLocation) {
+      where.location = { contains: normalizedLocation, mode: 'insensitive' };
     }
 
     const normalizedSearch = normalizeSearchTerm(search);
@@ -169,6 +176,33 @@ exports.getProducts = async (req, res) => {
       page: pageNumber,
       pages: Math.ceil(total / pageSize),
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getProductLocations = async (req, res) => {
+  try {
+    const rows = await prisma.product.findMany({
+      where: {
+        isActive: true,
+        expiresAt: { gt: new Date() },
+        location: { not: null },
+      },
+      select: { location: true },
+      distinct: ['location'],
+      orderBy: { location: 'asc' },
+    });
+
+    const locations = Array.from(
+      new Set(
+        rows
+          .map((row) => String(row.location || '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    res.json({ success: true, locations });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

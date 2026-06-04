@@ -998,6 +998,7 @@ body.goodone-admob-banner-active .native-bottom-nav {
 }
 
 .product-detail-main-image {
+  position: relative;
   width: 100%;
   height: clamp(320px, 50vw, 540px);
   aspect-ratio: 1 / 1;
@@ -1005,7 +1006,26 @@ body.goodone-admob-banner-active .native-bottom-nav {
   border-radius: 12px;
   border: 1px solid #eee;
   background: #fff;
-  cursor: grab;
+  cursor: pointer;
+  /* Let the page scroll vertically while we detect horizontal swipes ourselves. */
+  touch-action: pan-y;
+}
+
+.product-detail-zoom-hint {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  /* Taps must reach the gallery container, not this badge. */
+  pointer-events: none;
 }
 
 .product-detail-main-image img {
@@ -1046,6 +1066,93 @@ body.goodone-admob-banner-active .native-bottom-nav {
   height: 100%;
   display: block;
   object-fit: cover;
+}
+
+/* Fullscreen pinch-zoom image viewer (see components/ImageLightbox.js) */
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.92);
+  /* We drive all panning/zooming in JS, so the WebView must not pan/zoom itself. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.image-lightbox__img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  will-change: transform;
+  touch-action: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.image-lightbox__close,
+.image-lightbox__nav {
+  position: absolute;
+  z-index: 2;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.image-lightbox__close:active,
+.image-lightbox__nav:active {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.image-lightbox__close {
+  top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+  right: calc(env(safe-area-inset-right, 0px) + 0.75rem);
+  width: 44px;
+  height: 44px;
+  font-size: 1.1rem;
+}
+
+.image-lightbox__nav {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 46px;
+  height: 46px;
+  font-size: 1.3rem;
+}
+
+.image-lightbox__nav--prev {
+  left: 0.75rem;
+}
+
+.image-lightbox__nav--next {
+  right: 0.75rem;
+}
+
+.image-lightbox__counter {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 0.85rem;
 }
 
 @media (max-width: 430px) {

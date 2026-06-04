@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { productAPI, chatAPI, reportAPI } from "../api";
 import { useAuth } from "../AuthContext";
 import toast from "react-hot-toast";
 import { getUploadUrl } from "../config";
+import ImageLightbox from "../components/ImageLightbox";
 import { isSafeInternalPath } from "../components/NativeBackButtonHandler";
 import { shareProduct } from "../services/share";
 import { attemptOpenInApp, canOpenInApp } from "../services/openInApp";
@@ -25,7 +26,12 @@ export default function ProductDetail() {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeImg, setActiveImg] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
+  // Timestamp of the last touch, used to ignore the synthetic mouse events that
+  // mobile WebViews fire after a tap (so they don't trigger the desktop 360° spin).
+  const lastTouchRef = useRef(0);
+  const mainTouch = useRef({ x: 0, y: 0, time: 0, moved: false });
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -50,8 +56,10 @@ export default function ProductDetail() {
   }, [id]);
 
 
-  // 360° mouse move effect
+  // 360° mouse move effect (desktop only — skipped right after a touch so the
+  // synthetic mousemove a WebView fires on tap doesn't hijack the active image).
   const handleMouseMove = (e) => {
+    if (Date.now() - lastTouchRef.current < 600) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percent = x / rect.width;
@@ -63,7 +71,53 @@ export default function ProductDetail() {
     }
   };
 
- 
+  const openLightbox = () => setLightboxOpen(true);
+
+  // Desktop click opens the viewer; touch taps are handled in handleMainTouchEnd,
+  // so ignore the click the WebView synthesizes after a tap.
+  const handleMainClick = () => {
+    if (Date.now() - lastTouchRef.current < 600) return;
+    openLightbox();
+  };
+
+  const handleMainTouchStart = (e) => {
+    lastTouchRef.current = Date.now();
+    const touch = e.touches[0];
+    mainTouch.current = { x: touch.clientX, y: touch.clientY, time: Date.now(), moved: false };
+  };
+
+  const handleMainTouchMove = (e) => {
+    lastTouchRef.current = Date.now();
+    const touch = e.touches[0];
+    const dx = touch.clientX - mainTouch.current.x;
+    const dy = touch.clientY - mainTouch.current.y;
+    if (Math.hypot(dx, dy) > 10) mainTouch.current.moved = true;
+  };
+
+  const handleMainTouchEnd = (e) => {
+    lastTouchRef.current = Date.now();
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - mainTouch.current.x;
+    const dy = touch.clientY - mainTouch.current.y;
+    const elapsed = Date.now() - mainTouch.current.time;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+
+    // Horizontal swipe -> previous/next image (wrap). Mostly-vertical swipes are
+    // ignored so the page can still scroll.
+    if (absX > 45 && absX > absY * 1.2) {
+      if (dx < 0) setActiveImg((i) => (i + 1) % imgs.length);
+      else setActiveImg((i) => (i - 1 + imgs.length) % imgs.length);
+      return;
+    }
+
+    // A tap (no real movement) opens the zoomable fullscreen viewer.
+    if (!mainTouch.current.moved && elapsed < 350) {
+      openLightbox();
+    }
+  };
+
+
 
   const handleChat = async () => {
     if (!user) {
@@ -154,13 +208,32 @@ export default function ProductDetail() {
         {/* Gallery */}
         <div className="col-md-6">
           <div className="product-detail-gallery">
-            <div className="product-detail-main-image" onMouseMove={handleMouseMove}>
+            <div
+              className="product-detail-main-image"
+              onMouseMove={handleMouseMove}
+              onClick={handleMainClick}
+              onTouchStart={handleMainTouchStart}
+              onTouchMove={handleMainTouchMove}
+              onTouchEnd={handleMainTouchEnd}
+              role="button"
+              tabIndex={0}
+              aria-label="Open image viewer"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openLightbox();
+                }
+              }}
+            >
               <img
                 src={imgs[activeImg]}
                 alt={product.title}
                 loading="lazy"
                 onError={(e) => (e.target.src = PLACEHOLDER)}
               />
+              <span className="product-detail-zoom-hint" aria-hidden="true">
+                <i className="bi bi-arrows-fullscreen"></i>
+              </span>
             </div>
 
             {imgs.length > 1 && (
@@ -366,6 +439,17 @@ export default function ProductDetail() {
             </Link>
           </div>
         </div>
+      )}
+
+      {lightboxOpen && (
+        <ImageLightbox
+          images={imgs}
+          index={activeImg}
+          alt={product.title}
+          placeholder={PLACEHOLDER}
+          onClose={() => setLightboxOpen(false)}
+          onIndexChange={setActiveImg}
+        />
       )}
     </div>
   );

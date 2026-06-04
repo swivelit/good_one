@@ -33,6 +33,7 @@ export default function HomePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const search = (searchParams.get("search") || "").trim();
+  const location = (searchParams.get("location") || "").trim();
   const categoryParam = (searchParams.get("category") || "").trim();
   const categoryFromQuery =
     CATEGORIES.find((cat) => cat.toLowerCase() === categoryParam.toLowerCase()) || "All";
@@ -44,12 +45,19 @@ export default function HomePage() {
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [category, setCategory] = useState(categoryFromQuery);
+  const [locationInput, setLocationInput] = useState(location);
+  const [locationSuggestions, setLocationSuggestions] = useState([]);
   const browsePath = "/browse";
 
   const buildBrowseUrl = useCallback(
-    ({ nextCategory = category, nextSearch = search } = {}) => {
+    ({
+      nextCategory = category,
+      nextSearch = search,
+      nextLocation = location,
+    } = {}) => {
       const params = new URLSearchParams();
       const normalizedSearch = String(nextSearch || "").trim();
+      const normalizedLocation = String(nextLocation || "").trim();
 
       if (nextCategory && nextCategory !== "All") {
         params.set("category", nextCategory);
@@ -57,11 +65,14 @@ export default function HomePage() {
       if (normalizedSearch) {
         params.set("search", normalizedSearch);
       }
+      if (normalizedLocation) {
+        params.set("location", normalizedLocation);
+      }
 
       const query = params.toString();
       return query ? `${browsePath}?${query}` : browsePath;
     },
-    [browsePath, category, search]
+    [browsePath, category, search, location]
   );
 
   const fetchProducts = useCallback(async () => {
@@ -72,6 +83,7 @@ export default function HomePage() {
 
       if (category !== "All") params.category = category;
       if (search) params.search = search;
+      if (location) params.location = location;
 
       const { data } = await productAPI.getAll(params);
 
@@ -89,7 +101,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [category, page, search]);
+  }, [category, page, search, location]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -101,10 +113,21 @@ export default function HomePage() {
     }
   }, []);
 
+  const fetchLocations = useCallback(async () => {
+    try {
+      const { data } = await productAPI.getLocations();
+      setLocationSuggestions(data?.locations || []);
+    } catch (error) {
+      console.error("Location fetch error:", error);
+      setLocationSuggestions([]);
+    }
+  }, []);
+
   useEffect(() => {
     setPage(1);
     setCategory(categoryFromQuery);
-  }, [categoryFromQuery, search]);
+    setLocationInput(location);
+  }, [categoryFromQuery, search, location]);
 
   useEffect(() => {
     fetchProducts();
@@ -113,6 +136,10 @@ export default function HomePage() {
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
+
+  useEffect(() => {
+    fetchLocations();
+  }, [fetchLocations]);
 
   return (
     <>
@@ -292,6 +319,57 @@ export default function HomePage() {
               </button>
             ))}
           </div>
+
+          {/* Location Filter */}
+          <form
+            className="d-flex flex-wrap gap-2 mb-4 align-items-center"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setPage(1);
+              navigate(buildBrowseUrl({ nextLocation: locationInput }));
+            }}
+          >
+            <span className="fw-bold me-1 text-muted">
+              <i className="bi bi-geo-alt me-1"></i>Location:
+            </span>
+            <div className="input-group" style={{ maxWidth: 320 }}>
+              <input
+                className="form-control border-end-0"
+                type="search"
+                list="location-suggestions"
+                placeholder="City, Area"
+                value={locationInput}
+                onChange={(e) => setLocationInput(e.target.value)}
+                style={{ borderRadius: "10px 0 0 10px" }}
+              />
+              {locationInput && (
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary border-start-0"
+                  onClick={() => {
+                    setLocationInput("");
+                    setPage(1);
+                    navigate(buildBrowseUrl({ nextLocation: "" }));
+                  }}
+                  aria-label="Clear location filter"
+                >
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              )}
+              <button
+                className="btn btn-primary-custom"
+                type="submit"
+                style={{ borderRadius: "0 10px 10px 0" }}
+              >
+                <i className="bi bi-search"></i>
+              </button>
+            </div>
+            <datalist id="location-suggestions">
+              {locationSuggestions.map((loc) => (
+                <option key={loc} value={loc} />
+              ))}
+            </datalist>
+          </form>
 
           <div className="d-flex justify-content-between align-items-center mb-4">
             <h2 className="section-title mb-0">

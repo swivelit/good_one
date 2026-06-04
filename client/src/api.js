@@ -101,6 +101,7 @@ export const authAPI = {
 
 export const productAPI = {
   getAll: (params) => API.get('/products', { params }),
+  getLocations: () => API.get('/products/locations'),
   getOne: (id) => API.get(`/products/${id}`),
   create: (data) => API.post('/products', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
   update: (id, data) => API.put(`/products/${id}`, data),
