@@ -45,6 +45,24 @@ How it works:
 - After logging in, the admin is redirected to **`/admin/vendors`**, which lists every vendor with business name, owner name, email, phone number, and profile details.
 - The admin endpoint is `GET /api/vendors/admin/all` (protected by `protect` + `adminOnly`). Non-admin users receive `403` from both the route and the `/admin/vendors` page.
 
+## Listing duration & pre-expiry alerts
+
+Vendors choose how long a listing stays active when creating it (and may override the duration when renewing).
+
+- **Allowed durations (hours):** `12`, `24`, `48`, `72`, `168` (i.e. 12h, 24h, 2d, 3d, 7d). Default is `24`. Any other value is rejected with `400`.
+- On create, `expiresAt = now + durationHours`; the chosen `durationHours` is stored on the product. On renew, the stored duration is reused unless a new allowed `durationHours` is passed; `expiresAt` is recomputed and the pre-expiry flag is reset.
+- **Pre-expiry push alert** runs **in-process via `node-cron`** (no external scheduler). A job runs every **15 minutes**, finds active listings whose `expiresAt` is within the next **60 minutes** and that have not yet been notified (`expiryNotifiedAt IS NULL`), sends one FCM push (title `Your listing '<title>' expires soon`, `data.route = "/dashboard"`) to the vendor's enabled devices, then sets `expiryNotifiedAt = now` so each listing is alerted **exactly once**. Overlapping runs are guarded.
+- Real push delivery requires Firebase credentials (`FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS`); without them the sweep runs and marks rows but skips sending.
+
+## In-feed ads
+
+The product feed renders an **in-feed ad slot after every 6th product card** (`client/src/components/InlineProductAd.js`, inserted in `HomePage.js`).
+
+- AdMob in-feed ads require **NATIVE ads**, which `@capacitor-community/admob` does **not** support, and the existing unit `ca-app-pub-9859771616835832/9528517561` is a **BANNER** unit usable only as the bottom overlay. A NATIVE (not banner) ad unit plus a custom native Capacitor plugin are required for real in-feed ads.
+- Native ad unit env: `REACT_APP_ADMOB_ANDROID_NATIVE_ID` / `REACT_APP_ADMOB_IOS_NATIVE_ID`. In dev/test builds Google's native test units are used automatically. The slot uses a custom plugin registered as `NativeAd` when present.
+- Until that native plugin is present and filling, `InlineProductAd` renders a clearly-labeled in-house **placeholder** ("Sponsored / Your ad could be here") so the feed layout stays correct.
+- The **bottom overlay banner** points at the production BANNER unit `ca-app-pub-9859771616835832/9528517561` via `REACT_APP_ADMOB_ANDROID_BANNER_ID` when test ads are disabled.
+
 ## Capacitor mobile apps
 
 Android already exists at `client/android` and Capacitor Android 7 requires JDK 21 for Gradle builds. If your terminal still uses Java 17, switch `JAVA_HOME` to a JDK 21 install before running Gradle. iOS is generated when needed. Simulator builds require macOS, Xcode 26 or newer, and CocoaPods, but do not require Apple Developer Program payment or signing. Physical iPhone Debug builds require Xcode signing and can use a free Apple Account with a Personal Team for limited local testing. TestFlight, App Store, IPA export, and archive distribution require Apple Developer Program membership. Before iOS sync/build/archive, make sure `xcode-select` points to the full Xcode app and the Xcode license has been accepted.

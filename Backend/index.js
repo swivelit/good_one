@@ -10,6 +10,7 @@ const appConfigRoutes = require('./Routes/appConfigRoutes');
 const appVersionGate = require('./middleware/appVersionGate');
 const { uploadsDir } = require('./config/uploads');
 const { sanitizeUser } = require('./utils/serialize');
+const { startListingExpiryScheduler } = require('./services/listingExpiryScheduler');
 
 const app = express();
 const server = http.createServer(app);
@@ -195,7 +196,10 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await prisma.$connect();
-    server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`);
+      startListingExpiryScheduler();
+    });
   } catch (error) {
     console.error('Failed to connect to Postgres:', error.message);
     process.exit(1);

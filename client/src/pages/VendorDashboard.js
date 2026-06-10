@@ -6,14 +6,20 @@ import toast from "react-hot-toast";
 import { getUploadUrl } from "../config";
 import { shareProduct, shareVendor } from "../services/share";
 
-function getTimeLeft(expiresAt) {
+function getTimeLeft(expiresAt, durationHours = 24) {
   const diff = new Date(expiresAt) - new Date();
   if (diff <= 0) return { text: "Expired", cls: "timer-urgent", pct: 0 };
   const hours = Math.floor(diff / 3600000);
-  const pct = Math.round((diff / (24 * 3600000)) * 100);
+  const totalMs = (Number(durationHours) || 24) * 3600000;
+  const pct = Math.min(100, Math.max(0, Math.round((diff / totalMs) * 100)));
   if (hours < 2) return { text: `${hours}h left`, cls: "timer-urgent", pct };
   if (hours < 8) return { text: `${hours}h left`, cls: "timer-warning", pct };
   return { text: `${hours}h left`, cls: "timer-ok", pct };
+}
+
+function durationLabel(hours) {
+  const map = { 12: "12 hours", 24: "24 hours", 48: "2 days", 72: "3 days", 168: "7 days" };
+  return map[Number(hours)] || `${hours} hours`;
 }
 
 export default function VendorDashboard() {
@@ -40,8 +46,8 @@ export default function VendorDashboard() {
 
   const handleRenew = async (productId) => {
     try {
-      await productAPI.renew(productId);
-      toast.success("Product renewed for 24 hours!");
+      const { data } = await productAPI.renew(productId);
+      toast.success(data?.message || "Product renewed!");
       fetchProducts();
     } catch {
       toast.error("Failed to renew product");
@@ -274,7 +280,7 @@ export default function VendorDashboard() {
             <h6 className="fw-bold mb-3">Recent Listings</h6>
             <div className="row g-3">
               {products.slice(0, 6).map((p) => {
-                const timer = getTimeLeft(p.expiresAt);
+                const timer = getTimeLeft(p.expiresAt, p.durationHours);
                 return (
                   <div key={p._id} className="col-6 col-md-6 col-lg-4">
                     <div
@@ -330,8 +336,9 @@ export default function VendorDashboard() {
                             className="btn btn-sm btn-outline-success flex-fill"
                             style={{ fontSize: "0.75rem" }}
                             onClick={() => handleRenew(p._id)}
+                            title={`Renew ${durationLabel(p.durationHours)}`}
                           >
-                            <i className="bi bi-arrow-repeat me-1"></i>Renew
+                            <i className="bi bi-arrow-repeat me-1"></i>Renew {durationLabel(p.durationHours)}
                           </button>
                           <button
                             className="btn btn-sm btn-outline-danger"
@@ -392,7 +399,7 @@ export default function VendorDashboard() {
                   </thead>
                   <tbody>
                     {products.map((p) => {
-                      const timer = getTimeLeft(p.expiresAt);
+                      const timer = getTimeLeft(p.expiresAt, p.durationHours);
                       const isExp = new Date(p.expiresAt) <= new Date();
                       return (
                         <tr key={p._id}>
@@ -421,7 +428,8 @@ export default function VendorDashboard() {
                               <button
                                 className="btn btn-sm btn-outline-success"
                                 onClick={() => handleRenew(p._id)}
-                                title="Renew 24h"
+                                title={`Renew ${durationLabel(p.durationHours)}`}
+                                aria-label={`Renew ${p.title} for ${durationLabel(p.durationHours)}`}
                               >
                                 <i className="bi bi-arrow-repeat"></i>
                               </button>

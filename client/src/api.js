@@ -105,7 +105,7 @@ export const productAPI = {
   getOne: (id) => API.get(`/products/${id}`),
   create: (data) => API.post('/products', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
   update: (id, data) => API.put(`/products/${id}`, data),
-  renew: (id) => API.put(`/products/${id}/renew`),
+  renew: (id, body = {}) => API.put(`/products/${id}/renew`, body),
   delete: (id) => API.delete(`/products/${id}`),
   getMine: () => API.get('/products/my-products'),
   getByVendor: (vendorId) => API.get(`/products/vendor/${vendorId}`),

@@ -5,6 +5,15 @@ import toast from 'react-hot-toast';
 import { markVendorPostSuccessForInterstitial } from '../services/admob';
 
 const CATEGORIES = ['Electronics','Mobiles','Furniture','Clothing','Books','Sports','Home & Garden','Vehicles','Food','Other'];
+const DURATION_OPTIONS = [
+  { value: 12, label: '12 hours' },
+  { value: 24, label: '24 hours' },
+  { value: 48, label: '2 days' },
+  { value: 72, label: '3 days' },
+  { value: 168, label: '7 days' },
+];
+const durationLabel = (hours) =>
+  DURATION_OPTIONS.find((opt) => opt.value === Number(hours))?.label || `${hours} hours`;
 const CONDITIONS = [
   { value: 'new', label: 'Brand New', desc: 'Never used, original packaging' },
   { value: 'like-new', label: 'Like New', desc: 'Used once or twice, perfect condition' },
@@ -17,6 +26,7 @@ export default function AddProduct() {
   const [form, setForm] = useState({
     title: '', description: '', price: '', originalPrice: '',
     category: 'Electronics', condition: 'good', location: '', tags: '',
+    durationHours: 24,
   });
   const [images, setImages] = useState([]);
   const [previews, setPreviews] = useState([]);
@@ -47,7 +57,7 @@ export default function AddProduct() {
       images.forEach(img => fd.append('images', img));
       await productAPI.create(fd);
       markVendorPostSuccessForInterstitial();
-      toast.success('Product listed successfully! Active for 24 hours.');
+      toast.success(`Product listed successfully! Active for ${durationLabel(form.durationHours)}.`);
       navigate('/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create listing');
@@ -65,7 +75,7 @@ export default function AddProduct() {
 
       <div className="alert alert-info d-flex gap-2 mb-4 py-2">
         <i className="bi bi-info-circle-fill mt-1"></i>
-        <span>Your listing will be active for <strong>24 hours</strong>. You can renew it from your dashboard to keep it visible.</span>
+        <span>Your listing will be active for <strong>{durationLabel(form.durationHours)}</strong>. You can renew it from your dashboard to keep it visible.</span>
       </div>
 
       <div className="row g-4">
@@ -139,6 +149,32 @@ export default function AddProduct() {
                     <label className="form-label small fw-semibold">Tags <span className="text-muted fw-normal">(comma separated)</span></label>
                     <input type="text" className="form-control" placeholder="e.g. iphone, apple, smartphone" value={form.tags} onChange={e => setForm({...form,tags:e.target.value})} />
                   </div>
+                  <div className="col-12">
+                    <label className="form-label small fw-semibold">
+                      <i className="bi bi-clock me-1" style={{color:'#FF6B35'}}></i>Listing Duration
+                    </label>
+                    <div className="d-flex flex-wrap gap-2">
+                      {DURATION_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          className="btn btn-sm"
+                          aria-pressed={form.durationHours === opt.value}
+                          style={{
+                            borderRadius: 10,
+                            border: `2px solid ${form.durationHours === opt.value ? '#FF6B35' : '#dee2e6'}`,
+                            background: form.durationHours === opt.value ? '#fff5f0' : '#fafafa',
+                            color: form.durationHours === opt.value ? '#FF6B35' : '#495057',
+                            fontWeight: form.durationHours === opt.value ? 600 : 400,
+                          }}
+                          onClick={() => setForm({ ...form, durationHours: opt.value })}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <small className="text-muted">Choose how long this listing stays active. Default is 24 hours.</small>
+                  </div>
                 </div>
               </div>
             </div>
@@ -170,7 +206,7 @@ export default function AddProduct() {
             </div>
 
             <button type="submit" className="btn btn-primary-custom btn-lg w-100 add-product-submit" disabled={loading}>
-              {loading ? <><span className="spinner-border spinner-border-sm me-2"></span>Publishing...</> : <><i className="bi bi-cloud-upload me-2"></i>Publish Listing (24 Hours)</>}
+              {loading ? <><span className="spinner-border spinner-border-sm me-2"></span>Publishing...</> : <><i className="bi bi-cloud-upload me-2"></i>Publish Listing ({durationLabel(form.durationHours)})</>}
             </button>
           </form>
         </div>
@@ -192,7 +228,7 @@ export default function AddProduct() {
             </div>
             <div className="alert alert-warning mt-3 small">
               <i className="bi bi-clock me-2"></i>
-              <strong>24-Hour Rule:</strong> Your listing expires in 24 hours. Renew it from dashboard to keep it active.
+              <strong>Listing Duration:</strong> Your listing expires in {durationLabel(form.durationHours)}. Renew it from your dashboard to keep it active.
             </div>
           </div>
         </div>

@@ -30,6 +30,28 @@ const parseTags = (tags) => {
     .filter(Boolean);
 };
 
+const ALLOWED_DURATION_HOURS = [12, 24, 48, 72, 168];
+const DEFAULT_DURATION_HOURS = 24;
+
+// Returns { durationHours } when valid, or { error } when the provided value is
+// not one of the allowed options. When the value is absent and no fallback is
+// given, defaults to 24h.
+const resolveDurationHours = (rawValue, fallback = DEFAULT_DURATION_HOURS) => {
+  if (rawValue === undefined || rawValue === null || rawValue === '') {
+    return { durationHours: fallback };
+  }
+  const durationHours = Number(rawValue);
+  if (!Number.isInteger(durationHours) || !ALLOWED_DURATION_HOURS.includes(durationHours)) {
+    return {
+      error: `Invalid listing duration. Allowed values (hours): ${ALLOWED_DURATION_HOURS.join(', ')}.`,
+    };
+  }
+  return { durationHours };
+};
+
+const expiresAtFromDuration = (durationHours) =>
+  new Date(Date.now() + durationHours * 60 * 60 * 1000);
+
 const normalizeSearchTerm = (value) => String(value || '').trim().replace(/\s+/g, ' ');
 const isUuid = (value) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -273,6 +295,11 @@ exports.createProduct = async (req, res) => {
       return res.status(400).json({ success: false, message: pricingError });
     }
 
+    const { durationHours, error: durationError } = resolveDurationHours(req.body.durationHours);
+    if (durationError) {
+      return res.status(400).json({ success: false, message: durationError });
+    }
+
     assertCleanProductFields(req.body);
 
     const images = req.files ? req.files.map((file) => file.filename) : [];
@@ -282,7 +309,9 @@ exports.createProduct = async (req, res) => {
         vendorId: vendor.id,
         vendorUserId: req.user.id,
         images,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        durationHours,
+        expiresAt: expiresAtFromDuration(durationHours),
+        expiryNotifiedAt: null,
       },
     });
 
@@ -343,16 +372,31 @@ exports.renewProduct = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized.' });
     }
 
+    // Reuse the listing's stored duration unless the vendor overrides it.
+    const { durationHours, error: durationError } = resolveDurationHours(
+      req.body.durationHours,
+      product.durationHours || DEFAULT_DURATION_HOURS
+    );
+    if (durationError) {
+      return res.status(400).json({ success: false, message: durationError });
+    }
+
     const updated = await prisma.product.update({
       where: { id: req.params.id },
       data: {
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        durationHours,
+        expiresAt: expiresAtFromDuration(durationHours),
+        expiryNotifiedAt: null,
         renewedAt: new Date(),
         isActive: true,
         renewalCount: { increment: 1 },
       },
     });
-    res.json({ success: true, message: 'Product listing renewed for 24 hours!', product: toCompat(updated) });
+    res.json({
+      success: true,
+      message: `Product listing renewed for ${durationHours} hours!`,
+      product: toCompat(updated),
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

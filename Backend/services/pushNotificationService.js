@@ -76,6 +76,47 @@ const sendBatch = async ({ messaging, tokens, notification, data }) => {
   await disableInvalidTokens(invalidTokens);
 };
 
+exports.sendListingExpiryNotification = async ({ vendorUserId, product }) => {
+  try {
+    if (!vendorUserId || !product) return;
+
+    const messaging = getMessaging();
+    if (!messaging) return;
+
+    const pushTokens = await prisma.pushToken.findMany({
+      where: {
+        userId: vendorUserId,
+        enabled: true,
+      },
+      select: { token: true },
+    });
+
+    const tokens = pushTokens.map((entry) => entry.token).filter(Boolean);
+    if (!tokens.length) return;
+
+    const productId = product.id || product._id;
+    const productTitle = product.title || 'listing';
+
+    const notification = {
+      title: truncatePreview(`Your listing '${productTitle}' expires soon`),
+      body: 'Renew it from your dashboard to keep it visible.',
+    };
+
+    const data = {
+      type: 'listing-expiry',
+      route: '/dashboard',
+      productId: toDataValue(productId),
+    };
+
+    for (let index = 0; index < tokens.length; index += MAX_FCM_TOKENS) {
+      const batchTokens = tokens.slice(index, index + MAX_FCM_TOKENS);
+      await sendBatch({ messaging, tokens: batchTokens, notification, data });
+    }
+  } catch (error) {
+    console.error('Failed to send listing expiry push notification', error.message);
+  }
+};
+
 exports.sendChatNotification = async ({
   recipientUserId,
   sender,

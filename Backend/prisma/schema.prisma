@@ -75,7 +75,9 @@ model Product {
   images        String[] @default([])
   location      String?
   isActive      Boolean  @default(true)
+  durationHours Int      @default(24)
   expiresAt     DateTime @default(dbgenerated("(now() + interval '1 day')"))
+  expiryNotifiedAt DateTime?
   renewedAt     DateTime @default(now())
   views         Int      @default(0)
   renewalCount  Int      @default(0)

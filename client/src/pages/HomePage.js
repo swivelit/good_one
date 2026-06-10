@@ -3,6 +3,7 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { productAPI, statsAPI } from "../api";
 import ProductCard from "../productCard";
+import InlineProductAd from "../components/InlineProductAd";
 import toast from "react-hot-toast";
 import "../App.css";
 import CountUp from "react-countup";
@@ -441,10 +442,19 @@ export default function HomePage() {
           ) : (
             <>
               <div className="row g-3 g-md-4">
-                {products.map((p) => (
-                  <div key={p._id} className="col-6 col-md-4 col-lg-3">
-                    <ProductCard product={p} />
-                  </div>
+                {products.map((p, i) => (
+                  <React.Fragment key={p._id}>
+                    <div className="col-6 col-md-4 col-lg-3">
+                      <ProductCard product={p} />
+                    </div>
+                    {/* In-feed ad slot after every 6th product card. Full-width
+                        column so it spans the row and never breaks the grid. */}
+                    {(i + 1) % 6 === 0 && (
+                      <div className="col-12">
+                        <InlineProductAd index={i} />
+                      </div>
+                    )}
+                  </React.Fragment>
                 ))}
               </div>
 

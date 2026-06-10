@@ -58,6 +58,15 @@ const getChatRouteFromData = (data = {}) => {
   return null;
 };
 
+// Resolve the in-app route to open when a notification is tapped. Honors an
+// explicit absolute data.route (e.g. "/dashboard" for listing-expiry alerts),
+// otherwise falls back to the chat-specific resolution.
+const getRouteFromData = (data = {}) => {
+  const explicitRoute = data.route ? String(data.route) : '';
+  if (explicitRoute.startsWith('/')) return explicitRoute;
+  return getChatRouteFromData(data);
+};
+
 const isChatNotification = (data = {}) => data.type === 'chat' || Boolean(data.conversationId);
 
 const scheduleForegroundChatNotification = async (notification) => {
@@ -83,7 +92,7 @@ const scheduleForegroundChatNotification = async (notification) => {
 
 const navigateToNotificationRoute = (notification, navigate) => {
   const data = notification?.data || notification?.extra || {};
-  const route = getChatRouteFromData(data);
+  const route = getRouteFromData(data);
   if (route) navigate(route);
 };
 
