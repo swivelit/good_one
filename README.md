@@ -29,6 +29,22 @@ AdMob test ads stay enabled by default for local debug, simulator, and device te
 - Chat push notifications require `FIREBASE_SERVICE_ACCOUNT_JSON` in Render/local backend env, or a valid `GOOGLE_APPLICATION_CREDENTIALS` path. Do not commit Firebase service account JSON.
 - Set `CLIENT_URLS=https://good-one-jlcu.onrender.com,capacitor://localhost,ionic://localhost,http://localhost,https://localhost` for the Render backend. Also include the real final frontend domain if it is different.
 
+## Admin access
+
+There is a single built-in admin login that can view every vendor (including phone numbers and profile details). It is driven entirely by environment variables — there is **no admin user in the database** and no migration is required.
+
+- `ADMIN_USERNAME` — the admin login id. Default: `admin`
+- `ADMIN_PASSWORD` — the admin password. Default: `GoodOne@Admin2026`
+
+These defaults are committed in `Backend/.env.example` purely as placeholders. **The committed value is only a default — set the real credentials via the Render backend environment variables** (`ADMIN_USERNAME` and `ADMIN_PASSWORD`) under the service's *Environment* tab. Never ship the default password to production.
+
+How it works:
+
+- The admin signs in on the **normal login screen** (`/login`) using `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
+- A successful admin login returns a user with `role: 'admin'` and a token whose payload is `{ id: 'admin', role: 'admin' }` (no DB lookup is performed for admin requests).
+- After logging in, the admin is redirected to **`/admin/vendors`**, which lists every vendor with business name, owner name, email, phone number, and profile details.
+- The admin endpoint is `GET /api/vendors/admin/all` (protected by `protect` + `adminOnly`). Non-admin users receive `403` from both the route and the `/admin/vendors` page.
+
 ## Capacitor mobile apps
 
 Android already exists at `client/android` and Capacitor Android 7 requires JDK 21 for Gradle builds. If your terminal still uses Java 17, switch `JAVA_HOME` to a JDK 21 install before running Gradle. iOS is generated when needed. Simulator builds require macOS, Xcode 26 or newer, and CocoaPods, but do not require Apple Developer Program payment or signing. Physical iPhone Debug builds require Xcode signing and can use a free Apple Account with a Personal Team for limited local testing. TestFlight, App Store, IPA export, and archive distribution require Apple Developer Program membership. Before iOS sync/build/archive, make sure `xcode-select` points to the full Xcode app and the Xcode license has been accepted.

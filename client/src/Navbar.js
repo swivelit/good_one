@@ -43,8 +43,14 @@ export default function Navbar() {
   };
 
   const handleSearch = (e) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
     navigate(buildSearchUrl(search, locationQuery));
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "Enter") {
+      handleSearch(e);
+    }
   };
 
   const handleSearchChange = (e) => {
@@ -121,6 +127,7 @@ export default function Navbar() {
                 placeholder="Search products"
                 value={search}
                 onChange={handleSearchChange}
+                onKeyDown={handleSearchKeyDown}
               />
               <span
                 aria-hidden="true"
@@ -132,7 +139,11 @@ export default function Navbar() {
                 placeholder="Location"
                 value={locationQuery}
                 onChange={handleLocationChange}
+                onKeyDown={handleSearchKeyDown}
               />
+              <button type="submit" aria-label="Search">
+                <i className="bi bi-arrow-right"></i>
+              </button>
             </form>
           )}
         </header>

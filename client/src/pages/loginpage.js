@@ -18,7 +18,11 @@ export default function LoginPage() {
       const { data } = await authAPI.login(form);
       login(data.token, data.user, data.vendorProfile);
       toast.success(`Welcome back, ${data.user.name}!`);
-      navigate(data.user.role === 'vendor' ? '/dashboard' : '/');
+      if (data.user.role === 'admin') {
+        navigate('/admin/vendors');
+      } else {
+        navigate(data.user.role === 'vendor' ? '/dashboard' : '/');
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login failed');
     } finally {

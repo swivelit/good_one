@@ -12,6 +12,11 @@ const OTP_EXPIRES_MS = 5 * 60 * 1000;
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
 
+const generateAdminToken = () =>
+  jwt.sign({ id: 'admin', role: 'admin' }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRE || '7d',
+  });
+
 const isOtpExpired = (otp) =>
   !otp?.createdAt || Date.now() - new Date(otp.createdAt).getTime() > OTP_EXPIRES_MS;
 
@@ -238,6 +243,28 @@ exports.login = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Email/phone and password are required',
+      });
+    }
+
+    const adminUsername = process.env.ADMIN_USERNAME;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (
+      adminUsername &&
+      adminPassword &&
+      loginId === adminUsername &&
+      password === adminPassword
+    ) {
+      return res.json({
+        success: true,
+        token: generateAdminToken(),
+        user: {
+          id: 'admin',
+          name: 'Administrator',
+          role: 'admin',
+          email: adminUsername,
+        },
+        vendorProfile: null,
       });
     }
 

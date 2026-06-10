@@ -136,6 +136,7 @@ export const blockAPI = {
 
 export const vendorAPI = {
   getAll: () => API.get('/vendors'),
+  getAllAdmin: () => API.get('/vendors/admin/all'),
   getOne: (id) => API.get(`/vendors/${id}`),
   getMe: () => API.get('/vendors/me'),
   updateProfile: (data) => API.put('/vendors/profile', data),

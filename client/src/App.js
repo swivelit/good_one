@@ -22,6 +22,7 @@ import VendorDashboard from './pages/VendorDashboard';
 import VendorProfile from './pages/VendorProfile';
 import AddProduct from './pages/addProduct';
 import ProfilePage from './pages/ProfilePage';
+import AdminVendors from './pages/AdminVendors';
 import NotFound from './pages/NotFoundPage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import AccountDeletionPage from './pages/AccountDeletionPage';
@@ -112,6 +113,7 @@ function AppRoutes() {
         <Route path="/chat/:conversationId" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
         <Route path="/dashboard" element={<PrivateRoute role="vendor"><VendorDashboard /></PrivateRoute>} />
         <Route path="/dashboard/add-product" element={<PrivateRoute role="vendor"><AddProduct /></PrivateRoute>} />
+        <Route path="/admin/vendors" element={<PrivateRoute role="admin"><AdminVendors /></PrivateRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!isNative && <Footer />}

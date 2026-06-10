@@ -16,6 +16,10 @@ exports.protect = async (req, res, next) => {
   }
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role === 'admin') {
+      req.user = { id: 'admin', role: 'admin', name: 'Administrator' };
+      return next();
+    }
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) {
       return res.status(401).json({ success: false, message: 'User not found' });
@@ -50,4 +54,9 @@ exports.vendorOnly = (req, res, next) => {
 exports.customerOnly = (req, res, next) => {
   if (req.user && req.user.role === 'customer') return next();
   return res.status(403).json({ success: false, message: 'Access denied. Customers only.' });
+};
+
+exports.adminOnly = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') return next();
+  return res.status(403).json({ success: false, message: 'Access denied. Admins only.' });
 };

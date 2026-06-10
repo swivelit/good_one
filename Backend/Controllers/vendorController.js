@@ -26,6 +26,32 @@ exports.getVendors = async (req, res) => {
   }
 };
 
+exports.getAllVendorsAdmin = async (req, res) => {
+  try {
+    const vendors = await prisma.vendor.findMany({
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+            phone: true,
+            avatar: true,
+            createdAt: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      vendors: toCompat(vendors),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.getVendor = async (req, res) => {
   try {
     if (!isUuid(req.params.id)) {
