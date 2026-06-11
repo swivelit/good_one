@@ -5,6 +5,7 @@ import { useAuth } from "../AuthContext";
 import toast from "react-hot-toast";
 import { getUploadUrl } from "../config";
 import { shareProduct, shareVendor } from "../services/share";
+import { LISTING_DURATION_OPTIONS, durationLabel } from "../constants/listingDurations";
 
 function getTimeLeft(expiresAt, durationHours = 24) {
   const diff = new Date(expiresAt) - new Date();
@@ -17,16 +18,14 @@ function getTimeLeft(expiresAt, durationHours = 24) {
   return { text: `${hours}h left`, cls: "timer-ok", pct };
 }
 
-function durationLabel(hours) {
-  const map = { 12: "12 hours", 24: "24 hours", 48: "2 days", 72: "3 days", 168: "7 days" };
-  return map[Number(hours)] || `${hours} hours`;
-}
-
 export default function VendorDashboard() {
   const { user, vendorProfile } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [renewalProduct, setRenewalProduct] = useState(null);
+  const [selectedDurationHours, setSelectedDurationHours] = useState(24);
+  const [renewing, setRenewing] = useState(false);
  
 
   useEffect(() => {
@@ -44,13 +43,31 @@ export default function VendorDashboard() {
     }
   };
 
-  const handleRenew = async (productId) => {
+  const openRenewalSelector = (product) => {
+    setRenewalProduct(product);
+    setSelectedDurationHours(Number(product?.durationHours) || 24);
+  };
+
+  const closeRenewalSelector = () => {
+    if (renewing) return;
+    setRenewalProduct(null);
+  };
+
+  const handleRenew = async () => {
+    if (!renewalProduct) return;
+    const productId = renewalProduct._id || renewalProduct.id;
     try {
-      const { data } = await productAPI.renew(productId);
+      setRenewing(true);
+      const { data } = await productAPI.renew(productId, {
+        durationHours: selectedDurationHours,
+      });
       toast.success(data?.message || "Product renewed!");
+      setRenewalProduct(null);
       fetchProducts();
-    } catch {
-      toast.error("Failed to renew product");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to renew product");
+    } finally {
+      setRenewing(false);
     }
   };
 
@@ -335,7 +352,7 @@ export default function VendorDashboard() {
                           <button
                             className="btn btn-sm btn-outline-success flex-fill"
                             style={{ fontSize: "0.75rem" }}
-                            onClick={() => handleRenew(p._id)}
+                            onClick={() => openRenewalSelector(p)}
                             title={`Renew ${durationLabel(p.durationHours)}`}
                           >
                             <i className="bi bi-arrow-repeat me-1"></i>Renew {durationLabel(p.durationHours)}
@@ -427,7 +444,7 @@ export default function VendorDashboard() {
                             <div className="d-flex gap-1">
                               <button
                                 className="btn btn-sm btn-outline-success"
-                                onClick={() => handleRenew(p._id)}
+                                onClick={() => openRenewalSelector(p)}
                                 title={`Renew ${durationLabel(p.durationHours)}`}
                                 aria-label={`Renew ${p.title} for ${durationLabel(p.durationHours)}`}
                               >
@@ -473,6 +490,79 @@ export default function VendorDashboard() {
           <VendorProfileEdit vendorProfile={vendorProfile} />
         )}
       </div>
+      {renewalProduct && (
+        <div
+          className="modal d-block"
+          tabIndex="-1"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="renew-product-title"
+          style={{ background: "rgba(0,0,0,0.35)" }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow" style={{ borderRadius: 14 }}>
+              <div className="modal-header">
+                <div>
+                  <h5 className="modal-title fw-bold" id="renew-product-title">
+                    Renew listing
+                  </h5>
+                  <div className="small text-muted">{renewalProduct.title}</div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close"
+                  aria-label="Close renewal dialog"
+                  onClick={closeRenewalSelector}
+                  disabled={renewing}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <label htmlFor="renew-duration" className="form-label small fw-semibold">
+                  Listing duration
+                </label>
+                <select
+                  id="renew-duration"
+                  className="form-select"
+                  value={selectedDurationHours}
+                  onChange={(event) => setSelectedDurationHours(Number(event.target.value))}
+                >
+                  {LISTING_DURATION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="form-text">
+                  The renewed listing will stay active for {durationLabel(selectedDurationHours)}.
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={closeRenewalSelector}
+                  disabled={renewing}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary-custom"
+                  onClick={handleRenew}
+                  disabled={renewing}
+                >
+                  {renewing ? (
+                    <span className="spinner-border spinner-border-sm me-2"></span>
+                  ) : (
+                    <i className="bi bi-arrow-repeat me-2"></i>
+                  )}
+                  Confirm renew
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

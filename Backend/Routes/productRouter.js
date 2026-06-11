@@ -28,8 +28,8 @@ router.get('/my-products', protect, vendorOnly, getMyProducts);
 router.get('/vendor/:vendorId', getVendorProducts);
 router.get('/:id', optionalAuth, getProduct);
 router.post('/', protect, vendorOnly, upload.array('images', 5), createProduct);
-router.put('/:id', protect, vendorOnly, updateProduct);
-router.put('/:id/renew', protect, vendorOnly, renewProduct);
+router.put('/:id', protect, updateProduct);
+router.put('/:id/renew', protect, renewProduct);
 router.delete('/:id', protect, vendorOnly, deleteProduct);
 
 module.exports = router;

@@ -23,6 +23,7 @@ import VendorProfile from './pages/VendorProfile';
 import AddProduct from './pages/addProduct';
 import ProfilePage from './pages/ProfilePage';
 import AdminVendors from './pages/AdminVendors';
+import AdminVendorDetail from './pages/AdminVendorDetail';
 import NotFound from './pages/NotFoundPage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import AccountDeletionPage from './pages/AccountDeletionPage';
@@ -48,9 +49,11 @@ const NativeStartRoute = () => {
   const { user, loading } = useAuth();
 
   if (loading) return <div className="d-flex justify-content-center align-items-center" style={{minHeight:'60vh'}}><div className="spinner-border text-warning" /></div>;
-  // Native vendors go straight to their dashboard; everyone else — including
-  // unauthenticated native users — lands on the browsing page. (Sign In stays
-  // reachable from the Navbar.) On web this always falls through to HomePage.
+  // Native admins and vendors go straight to their work areas; everyone else,
+  // including unauthenticated native users, lands on the browsing page. (Sign
+  // In stays reachable from the Navbar.) On web this always falls through to
+  // HomePage.
+  if (Capacitor.isNativePlatform() && user?.role === "admin") return <Navigate to="/admin/vendors" replace />;
   if (Capacitor.isNativePlatform() && user?.role === "vendor") return <Navigate to="/dashboard" replace />;
   return <HomePage />;
 };
@@ -114,6 +117,7 @@ function AppRoutes() {
         <Route path="/dashboard" element={<PrivateRoute role="vendor"><VendorDashboard /></PrivateRoute>} />
         <Route path="/dashboard/add-product" element={<PrivateRoute role="vendor"><AddProduct /></PrivateRoute>} />
         <Route path="/admin/vendors" element={<PrivateRoute role="admin"><AdminVendors /></PrivateRoute>} />
+        <Route path="/admin/vendors/:id" element={<PrivateRoute role="admin"><AdminVendorDetail /></PrivateRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!isNative && <Footer />}

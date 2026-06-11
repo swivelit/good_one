@@ -6,7 +6,9 @@ getVendors,
 getVendor,
 getMyProfile,
 updateProfile,
-getAllVendorsAdmin
+getAllVendorsAdmin,
+getVendorAdmin,
+updateVendorAdminProfile
 } = require('../Controllers/vendorController');
 
 const {protect, adminOnly} = require('../middleware/auth');
@@ -18,6 +20,8 @@ router.get('/me',protect,getMyProfile);
 router.put('/profile',protect,updateProfile);
 
 router.get('/admin/all',protect,adminOnly,getAllVendorsAdmin);
+router.get('/admin/:id',protect,adminOnly,getVendorAdmin);
+router.put('/admin/:id/profile',protect,adminOnly,updateVendorAdminProfile);
 
 router.get('/:id',getVendor);
 

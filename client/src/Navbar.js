@@ -13,6 +13,14 @@ export default function Navbar() {
   const isNative = Capacitor.isNativePlatform();
   const browsePath = "/browse";
   const logoutPath = isNative ? "/" : "/login";
+  const homePath =
+    user?.role === "admin" ? "/admin/vendors" : user?.role === "vendor" ? "/dashboard" : "/";
+  const primaryNativePath =
+    user?.role === "admin" ? "/admin/vendors" : user?.role === "vendor" ? "/dashboard" : "/browse";
+  const primaryNativeLabel =
+    user?.role === "admin" ? "Admin vendors" : user?.role === "vendor" ? "Dashboard" : "Browse";
+  const primaryNativeIcon =
+    user?.role === "admin" ? "bi-people" : user?.role === "vendor" ? "bi-speedometer2" : "bi-grid";
   const showNativeSearch =
     isNative &&
     (location.pathname === "/" ||
@@ -76,7 +84,7 @@ export default function Navbar() {
       <>
         <header className="native-topbar">
           <div className="native-topbar-row">
-            <Link className="native-brand" to={user?.role === "vendor" ? "/dashboard" : "/"}>
+            <Link className="native-brand" to={homePath}>
               <i className="bi bi-shop-window"></i>
               <span>GoodOne</span>
             </Link>
@@ -90,10 +98,10 @@ export default function Navbar() {
                 <>
                   <Link
                     className="native-icon-button"
-                    to={user.role === "vendor" ? "/dashboard" : "/browse"}
-                    aria-label={user.role === "vendor" ? "Dashboard" : "Browse"}
+                    to={primaryNativePath}
+                    aria-label={primaryNativeLabel}
                   >
-                    <i className={`bi ${user.role === "vendor" ? "bi-speedometer2" : "bi-grid"}`}></i>
+                    <i className={`bi ${primaryNativeIcon}`}></i>
                   </Link>
                   <Link className="native-icon-button" to="/chat" aria-label="Messages">
                     <i className="bi bi-chat-dots"></i>
@@ -171,6 +179,15 @@ export default function Navbar() {
                   <span>Add</span>
                 </Link>
               </>
+            )}
+            {user.role === "admin" && (
+              <Link
+                to="/admin/vendors"
+                className={location.pathname.startsWith("/admin/vendors") ? "active" : ""}
+              >
+                <i className="bi bi-people"></i>
+                <span>Admin</span>
+              </Link>
             )}
             <Link to="/chat" className={location.pathname.startsWith("/chat") ? "active" : ""}>
               <i className="bi bi-chat-dots"></i>
@@ -284,6 +301,13 @@ export default function Navbar() {
                     </Link>
                   </li>
                 )}
+                {user.role === "admin" && (
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/admin/vendors">
+                      <i className="bi bi-people me-1"></i>Admin/Vendors
+                    </Link>
+                  </li>
+                )}
                 <li className="nav-item">
                   <Link className="nav-link" to="/profile">
                     <i className="bi bi-person-circle me-1"></i>Profile
@@ -355,6 +379,13 @@ export default function Navbar() {
                       <li>
                         <Link className="dropdown-item" to="/chat"  style={{ color: "#0d6efd" }}>
                           <i className="bi bi-chat-dots me-2"></i>Messages
+                        </Link>
+                      </li>
+                    )}
+                    {user.role === "admin" && (
+                      <li>
+                        <Link className="dropdown-item" to="/admin/vendors" style={{ color: "#0d6efd" }}>
+                          <i className="bi bi-people me-2"></i>Admin/Vendors
                         </Link>
                       </li>
                     )}

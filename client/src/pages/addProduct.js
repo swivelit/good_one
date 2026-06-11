@@ -3,17 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { productAPI } from '../api';
 import toast from 'react-hot-toast';
 import { markVendorPostSuccessForInterstitial } from '../services/admob';
+import { LISTING_DURATION_OPTIONS, durationLabel } from '../constants/listingDurations';
 
 const CATEGORIES = ['Electronics','Mobiles','Furniture','Clothing','Books','Sports','Home & Garden','Vehicles','Food','Other'];
-const DURATION_OPTIONS = [
-  { value: 12, label: '12 hours' },
-  { value: 24, label: '24 hours' },
-  { value: 48, label: '2 days' },
-  { value: 72, label: '3 days' },
-  { value: 168, label: '7 days' },
-];
-const durationLabel = (hours) =>
-  DURATION_OPTIONS.find((opt) => opt.value === Number(hours))?.label || `${hours} hours`;
 const CONDITIONS = [
   { value: 'new', label: 'Brand New', desc: 'Never used, original packaging' },
   { value: 'like-new', label: 'Like New', desc: 'Used once or twice, perfect condition' },
@@ -154,7 +146,7 @@ export default function AddProduct() {
                       <i className="bi bi-clock me-1" style={{color:'#FF6B35'}}></i>Listing Duration
                     </label>
                     <div className="d-flex flex-wrap gap-2">
-                      {DURATION_OPTIONS.map((opt) => (
+                      {LISTING_DURATION_OPTIONS.map((opt) => (
                         <button
                           key={opt.value}
                           type="button"

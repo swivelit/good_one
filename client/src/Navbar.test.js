@@ -70,4 +70,16 @@ describe('Navbar search', () => {
 
     expect(profileNavLink).toHaveAttribute('href', '/profile');
   });
+
+  test('logged-in admin sees an Admin/Vendors link on web', () => {
+    mockUser = { name: 'Admin User', role: 'admin' };
+
+    render(<Navbar />);
+
+    const adminLink = screen
+      .getAllByRole('link', { name: /admin\/vendors/i })
+      .find((link) => link.getAttribute('href') === '/admin/vendors');
+
+    expect(adminLink).toBeInTheDocument();
+  });
 });

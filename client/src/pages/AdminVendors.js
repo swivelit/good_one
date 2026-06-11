@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { vendorAPI } from '../api';
 import { getUploadUrl } from '../config';
 import toast from 'react-hot-toast';
@@ -159,6 +160,20 @@ export default function AdminVendors() {
                         {vendor.verificationStatus || (vendor.isApproved ? 'approved' : 'pending')}
                       </li>
                     </ul>
+                    <div className="d-flex gap-2 flex-wrap mt-3">
+                      <Link
+                        className="btn btn-sm btn-primary-custom"
+                        to={`/admin/vendors/${vendor._id || vendor.id}`}
+                      >
+                        <i className="bi bi-sliders me-1"></i>Manage
+                      </Link>
+                      <Link
+                        className="btn btn-sm btn-outline-secondary"
+                        to={`/vendors/${vendor._id || vendor.id}`}
+                      >
+                        <i className="bi bi-box-arrow-up-right me-1"></i>View Public Profile
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>

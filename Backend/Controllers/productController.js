@@ -52,6 +52,9 @@ const resolveDurationHours = (rawValue, fallback = DEFAULT_DURATION_HOURS) => {
 const expiresAtFromDuration = (durationHours) =>
   new Date(Date.now() + durationHours * 60 * 60 * 1000);
 
+const canManageProduct = (req, product) =>
+  req.user?.role === 'admin' || product.vendorUserId === req.user?.id;
+
 const normalizeSearchTerm = (value) => String(value || '').trim().replace(/\s+/g, ' ');
 const isUuid = (value) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -337,7 +340,7 @@ exports.updateProduct = async (req, res) => {
 
     const product = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
-    if (product.vendorUserId !== req.user.id) {
+    if (!canManageProduct(req, product)) {
       return res.status(403).json({ success: false, message: 'Not authorized.' });
     }
 
@@ -368,7 +371,7 @@ exports.renewProduct = async (req, res) => {
 
     const product = await prisma.product.findUnique({ where: { id: req.params.id } });
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
-    if (product.vendorUserId !== req.user.id) {
+    if (!canManageProduct(req, product)) {
       return res.status(403).json({ success: false, message: 'Not authorized.' });
     }
 
