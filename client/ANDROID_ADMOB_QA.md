@@ -209,14 +209,25 @@ The localStorage override wins for local QA on native Android. The promo stays h
 
 Code-side:
 
-- The plugin uses Google Mobile Ads SDK and can work with AdMob mediation when adapters are present in the native project.
-- No third-party mediation adapters are currently added in `client/android/app/build.gradle`.
-- Do not add random ad network SDKs without confirmed network choices, app IDs, adapter versions, and credentials.
+- Google Mobile Ads SDK is present through
+  `com.google.android.gms:play-services-ads` in
+  `client/android/app/build.gradle`.
+- Third-party mediation adapters are not currently added in
+  `client/android/app/build.gradle`.
+- Do not add AppLovin, Unity, Meta/Facebook, or any other ad network SDK until
+  the AdMob mediation groups and third-party network accounts are configured.
+- Adapter dependencies must be added only after the exact mediation plan is
+  known: chosen networks, account IDs, SDK keys, app IDs, placement/ad-unit
+  mappings, and adapter versions.
+- The native in-feed plugin uses Google Mobile Ads SDK `NativeAdView` and can
+  participate in AdMob mediation once the correct adapters are intentionally
+  added.
 
 AdMob-console-side:
 
 - Create mediation groups.
-- Choose networks and configure credentials.
+- Choose networks and configure credentials/account links.
+- Map each AdMob ad unit to the corresponding third-party placement or ad unit.
 - Follow each network's adapter setup instructions.
 - Add required adapter dependencies only after the mediation plan is known.
 - Test through demo/test devices and logs.

@@ -29,6 +29,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "app-links:validate": "node scripts/validate-assetlinks.js",
+    "verify:app-ads": "node scripts/verify-app-ads.js",
     "build:android:apk": "bash ../scripts/build-android-apk.sh",
     "build:android:release:apk": "bash ../scripts/build-android_release-apk.sh",
     "build:ios": "bash ../scripts/build-ios.sh",

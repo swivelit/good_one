@@ -118,9 +118,19 @@ Public policy routes are available without login:
 - `/terms`
 - `/account-deletion`
 
-`client/public/app-ads.txt` is included for AdMob seller verification. This only
-works if the deployed frontend domain is also set as the Google Play developer
-website, because `app-ads.txt` must be available at the domain root.
+`client/public/app-ads.txt` is included for AdMob seller verification and must
+contain exactly:
+
+```txt
+google.com, pub-9859771616835832, DIRECT, f08c47fec0942fa0
+```
+
+Create React App copies this file to `client/build/app-ads.txt`; run
+`cd client && npm run build && npm run verify:app-ads` before deploying. This
+only works if the deployed frontend domain is also set as the Google Play
+developer website, because `app-ads.txt` must be available at the domain root as
+`https://<frontend-domain>/app-ads.txt`. That URL must return the text file
+above, not the React `index.html` shell.
 
 ### App icon assets
 
@@ -299,9 +309,15 @@ Store submission checklist:
 ### Frontend Render
 
 - Root Directory: `client`
-- Build Command: `npm ci && npm run build`
+- Build Command: `npm ci && npm run build && npm run verify:app-ads`
 - Publish Directory: `build`
 - Rewrite: `/* -> /index.html`
+- Static files in `build`, including `/app-ads.txt` and
+  `/.well-known/assetlinks.json`, must be served before the React catch-all
+  rewrite. Do not add a rewrite/redirect that sends `/app-ads.txt` to
+  `/index.html`. After deploy, verify
+  `https://good-one-jlcu.onrender.com/app-ads.txt` returns the exact line shown
+  above.
 
 ### Testing
 
