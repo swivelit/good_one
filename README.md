@@ -17,7 +17,7 @@ Replace `https://good-one-api.onrender.com` before production builds if the real
 
 React environment variables are public. `client/src/config.js` already falls back to `https://good-one-api.onrender.com` for production backend builds and `https://good-one-jlcu.onrender.com` for public share links when these values are not set.
 
-AdMob test ads stay enabled by default for local debug, simulator, and device testing with `REACT_APP_USE_ADMOB_TEST_ADS=true`. For approved production release builds only, set `REACT_APP_USE_ADMOB_TEST_ADS=false` and provide the platform-specific production unit IDs, for example `REACT_APP_ADMOB_ANDROID_BANNER_ID` and `REACT_APP_ADMOB_IOS_BANNER_ID`. Local test builds do not require production AdMob IDs.
+AdMob test ads stay enabled by default for local debug, simulator, and device testing with `REACT_APP_USE_ADMOB_TEST_ADS=true`. For approved production release builds only, set `REACT_APP_USE_ADMOB_TEST_ADS=false` and provide the platform-specific production unit IDs, for example `REACT_APP_ADMOB_ANDROID_BANNER_ID` and `REACT_APP_ADMOB_IOS_BANNER_ID`. Local test builds do not require production AdMob IDs. These `REACT_APP_*` values are compiled into the React/Android build; backend Render environment variables do not change an already-built Android APK.
 
 ## Render backend deployment
 
@@ -25,7 +25,7 @@ AdMob test ads stay enabled by default for local debug, simulator, and device te
 - Build command: `npm ci && npx prisma generate`
 - Pre-deploy command: `npx prisma migrate deploy`
 - Start command: `npm start`
-- Required environment variables include `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRE`, `CLIENT_URLS`, `EMAIL_USER`, and `EMAIL_PASS`.
+- Required environment variables include `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRE`, `CLIENT_URLS`, `EMAIL_USER`, `EMAIL_PASS`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD`.
 - Chat push notifications require `FIREBASE_SERVICE_ACCOUNT_JSON` in Render/local backend env, or a valid `GOOGLE_APPLICATION_CREDENTIALS` path. Do not commit Firebase service account JSON.
 - Set `CLIENT_URLS=https://good-one-jlcu.onrender.com,capacitor://localhost,ionic://localhost,http://localhost,https://localhost` for the Render backend. Also include the real final frontend domain if it is different.
 
@@ -33,10 +33,10 @@ AdMob test ads stay enabled by default for local debug, simulator, and device te
 
 There is a single built-in admin login that can view every vendor (including phone numbers and profile details). It is driven entirely by environment variables — there is **no admin user in the database** and no migration is required.
 
-- `ADMIN_USERNAME` — the admin login id. Default: `admin`
-- `ADMIN_PASSWORD` — the admin password. Default: `GoodOne@Admin2026`
+- `ADMIN_USERNAME` — the admin login id.
+- `ADMIN_PASSWORD` — the admin password.
 
-These defaults are committed in `Backend/.env.example` purely as placeholders. **The committed value is only a default — set the real credentials via the Render backend environment variables** (`ADMIN_USERNAME` and `ADMIN_PASSWORD`) under the service's *Environment* tab. Never ship the default password to production.
+`Backend/.env.example` contains placeholders only. **Set the real credentials via the Render backend environment variables using the exact names `ADMIN_USERNAME` and `ADMIN_PASSWORD`** under the service's *Environment* tab. A lowercase `username`/`password` fallback exists only to recover from the current misconfiguration and should be replaced.
 
 How it works:
 
@@ -58,10 +58,10 @@ Vendors choose how long a listing stays active when creating it (and may overrid
 
 The product feed renders an **in-feed ad slot after every 6th product card** (`client/src/components/InlineProductAd.js`, inserted in `HomePage.js`).
 
-- AdMob in-feed ads require **NATIVE ads**, which `@capacitor-community/admob` does **not** support, and the existing unit `ca-app-pub-9859771616835832/9528517561` is a **BANNER** unit usable only as the bottom overlay. A NATIVE (not banner) ad unit plus a custom native Capacitor plugin are required for real in-feed ads.
-- Native ad unit env: `REACT_APP_ADMOB_ANDROID_NATIVE_ID` / `REACT_APP_ADMOB_IOS_NATIVE_ID`. In dev/test builds Google's native test units are used automatically. The slot uses a custom plugin registered as `NativeAd` when present.
-- Until that native plugin is present and filling, `InlineProductAd` renders a clearly-labeled in-house **placeholder** ("Sponsored / Your ad could be here") so the feed layout stays correct.
-- The **bottom overlay banner** points at the production BANNER unit `ca-app-pub-9859771616835832/9528517561` via `REACT_APP_ADMOB_ANDROID_BANNER_ID` when test ads are disabled.
+- AdMob in-feed ads require **NATIVE ads**. The Android app includes a custom Capacitor plugin registered as `NativeAd` that renders an SDK-owned `NativeAdView` over the feed slot so clicks, impressions, AdChoices, and ad attribution are handled by Google Mobile Ads SDK.
+- Native ad unit env: `REACT_APP_ADMOB_ANDROID_NATIVE_ID` / `REACT_APP_ADMOB_IOS_NATIVE_ID`. Android production Native Advanced unit: `ca-app-pub-9859771616835832/9924103380`. In dev/test builds Google's native test units are used automatically.
+- The **bottom overlay banner** points at the production BANNER unit `ca-app-pub-9859771616835832/2509706314` via `REACT_APP_ADMOB_ANDROID_BANNER_ID` when test ads are disabled. The interstitial unit is `ca-app-pub-9859771616835832/7980278971`.
+- `ca-app-pub-9859771616835832/9528517561` is a banner unit and must not be used as the Native Advanced in-feed ad.
 
 ## Capacitor mobile apps
 

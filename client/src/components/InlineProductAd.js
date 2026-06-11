@@ -1,128 +1,250 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Capacitor } from "@capacitor/core";
-import { getAdMobAdUnitConfig, ADMOB_FORMATS } from "../services/admob/config";
+import React, { useEffect, useMemo, useRef } from "react";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+import { useLocation } from "react-router-dom";
+import {
+  ADMOB_FORMATS,
+  getAdMobAdUnitConfig,
+  maskAdMobAdUnitId,
+} from "../services/admob/config";
 
-// Self-contained inline (in-feed) ad slot rendered between product cards.
-//
-// AdMob in-feed ads require NATIVE ads, which @capacitor-community/admob does
-// not support. The native path needs a custom Capacitor plugin (registered as
-// "NativeAd") that loads a GADNativeAd / NativeAd and returns its asset fields.
-// Until that plugin is present AND fills a real native ad, this component
-// renders a clearly-labeled in-house placeholder so the feed layout is correct
-// and nothing is broken. If/when the plugin is added, this component will use
-// it automatically with no further wiring.
-//
-// Expected (future) plugin contract:
-//   const NativeAd = registerPlugin('NativeAd');
-//   const ad = await NativeAd.load({ adId });
-//   // ad: { headline, body, callToAction, iconUrl, imageUrl, advertiser }
-//   await NativeAd.registerView({ adId, ... }); // for impression/click tracking
+const INLINE_AD_HEIGHT_PX = 312;
+
+let slotCounter = 0;
+let registeredNativeAdPlugin = null;
+
+try {
+  registeredNativeAdPlugin = registerPlugin("NativeAd");
+} catch {
+  registeredNativeAdPlugin = null;
+}
 
 const getNativeAdPlugin = () => {
   try {
-    const plugins = Capacitor?.Plugins || {};
-    const plugin = plugins.NativeAd;
-    if (plugin && typeof plugin.load === "function") return plugin;
+    const plugin = registeredNativeAdPlugin || Capacitor?.Plugins?.NativeAd;
+    if (
+      plugin &&
+      typeof plugin.create === "function" &&
+      typeof plugin.load === "function" &&
+      typeof plugin.show === "function" &&
+      typeof plugin.updatePosition === "function" &&
+      typeof plugin.hide === "function" &&
+      typeof plugin.destroy === "function"
+    ) {
+      return plugin;
+    }
   } catch {
     /* no-op */
   }
   return null;
 };
 
+const isAndroidNative = () => {
+  try {
+    return Capacitor?.isNativePlatform?.() && Capacitor?.getPlatform?.() === "android";
+  } catch {
+    return false;
+  }
+};
+
+const getFrameForElement = (element) => {
+  if (!element) return null;
+
+  const rect = element.getBoundingClientRect();
+  const viewport = window.visualViewport;
+  const viewportWidth = viewport?.width || window.innerWidth || document.documentElement.clientWidth || 0;
+  const viewportHeight = viewport?.height || window.innerHeight || document.documentElement.clientHeight || 0;
+  const visible = (
+    document.visibilityState !== "hidden" &&
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.bottom > 0 &&
+    rect.right > 0 &&
+    rect.top < viewportHeight &&
+    rect.left < viewportWidth
+  );
+
+  return {
+    x: rect.left,
+    y: rect.top,
+    width: rect.width,
+    height: rect.height,
+    scale: window.devicePixelRatio || 1,
+    visible,
+  };
+};
+
+const logNativeAdEvent = (message, details = {}) => {
+  if (process.env.NODE_ENV === "production") return;
+  console.info("[InlineProductAd]", message, details);
+};
+
+const warnNativeAdEvent = (message, error, details = {}) => {
+  console.warn("[InlineProductAd]", message, {
+    ...details,
+    error: error?.message || error,
+  });
+};
+
 export default function InlineProductAd({ index = 0 }) {
-  const [nativeAd, setNativeAd] = useState(null);
-  const mountedRef = useRef(true);
+  const location = useLocation();
+  const containerRef = useRef(null);
+  const mountedRef = useRef(false);
+  const rafRef = useRef(0);
+  const slotId = useMemo(() => {
+    slotCounter += 1;
+    return `inline-product-ad-${index}-${slotCounter}`;
+  }, [index]);
 
   useEffect(() => {
     mountedRef.current = true;
     const plugin = getNativeAdPlugin();
+    const androidNative = isAndroidNative();
 
-    // No native plugin available (current state) → keep the placeholder.
-    if (!plugin || !Capacitor?.isNativePlatform?.()) {
+    if (!plugin || !androidNative) {
       return () => {
         mountedRef.current = false;
       };
     }
 
-    const { adId } = getAdMobAdUnitConfig(ADMOB_FORMATS.NATIVE);
-    if (!adId) {
-      return () => {
-        mountedRef.current = false;
-      };
-    }
+    const config = getAdMobAdUnitConfig(ADMOB_FORMATS.NATIVE, "android");
+    const maskedAdId = maskAdMobAdUnitId(config.adId);
 
-    plugin
-      .load({ adId })
-      .then((ad) => {
-        // Only render a native ad if the unit actually FILLED.
-        if (mountedRef.current && ad && (ad.headline || ad.body)) {
-          setNativeAd(ad);
-        }
-      })
-      .catch((error) => {
-        // Fill failure / no-fill → silently keep the placeholder.
-        console.warn("[InlineProductAd] native ad load failed", error?.message || error);
+    if (!config.configured) {
+      logNativeAdEvent("native ad skipped because no unit is configured", {
+        source: config.source,
+        useTestAds: config.useTestAds,
       });
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+
+    const frame = () => getFrameForElement(containerRef.current);
+    const updateNativePosition = () => {
+      if (!mountedRef.current) return;
+
+      const nextFrame = frame();
+      if (!nextFrame) return;
+
+      plugin.updatePosition({
+        slotId,
+        ...nextFrame,
+      }).catch((error) => {
+        warnNativeAdEvent("native ad position update failed", error, { slotId, adId: maskedAdId });
+      });
+    };
+
+    const requestPositionUpdate = () => {
+      if (rafRef.current) return;
+      rafRef.current = window.requestAnimationFrame(() => {
+        rafRef.current = 0;
+        updateNativePosition();
+      });
+    };
+
+    let resizeObserver = null;
+    let intersectionObserver = null;
+
+    const attachPositionListeners = () => {
+      window.addEventListener("scroll", requestPositionUpdate, true);
+      window.addEventListener("resize", requestPositionUpdate);
+      window.addEventListener("orientationchange", requestPositionUpdate);
+      document.addEventListener("visibilitychange", requestPositionUpdate);
+      window.visualViewport?.addEventListener?.("resize", requestPositionUpdate);
+      window.visualViewport?.addEventListener?.("scroll", requestPositionUpdate);
+
+      if ("ResizeObserver" in window && containerRef.current) {
+        resizeObserver = new ResizeObserver(requestPositionUpdate);
+        resizeObserver.observe(containerRef.current);
+      }
+
+      if ("IntersectionObserver" in window && containerRef.current) {
+        intersectionObserver = new IntersectionObserver(requestPositionUpdate, {
+          threshold: [0, 0.25, 0.5, 0.75, 1],
+        });
+        intersectionObserver.observe(containerRef.current);
+      }
+    };
+
+    const detachPositionListeners = () => {
+      window.removeEventListener("scroll", requestPositionUpdate, true);
+      window.removeEventListener("resize", requestPositionUpdate);
+      window.removeEventListener("orientationchange", requestPositionUpdate);
+      document.removeEventListener("visibilitychange", requestPositionUpdate);
+      window.visualViewport?.removeEventListener?.("resize", requestPositionUpdate);
+      window.visualViewport?.removeEventListener?.("scroll", requestPositionUpdate);
+      resizeObserver?.disconnect?.();
+      intersectionObserver?.disconnect?.();
+      if (rafRef.current) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
+    };
+
+    attachPositionListeners();
+
+    const loadNativeAd = async () => {
+      const initialFrame = frame();
+      if (!initialFrame) return;
+
+      try {
+        await plugin.create({
+          slotId,
+          adId: config.adId,
+          source: config.source,
+          useTestAds: config.useTestAds,
+          ...initialFrame,
+        });
+
+        logNativeAdEvent("native ad load requested", {
+          slotId,
+          adId: maskedAdId,
+          source: config.source,
+          useTestAds: config.useTestAds,
+        });
+
+        await plugin.load({ slotId, adId: config.adId });
+        if (!mountedRef.current) return;
+
+        await plugin.show({
+          slotId,
+          ...frame(),
+        });
+        requestPositionUpdate();
+      } catch (error) {
+        warnNativeAdEvent("native ad load failed; keeping placeholder", error, {
+          slotId,
+          adId: maskedAdId,
+          source: config.source,
+          useTestAds: config.useTestAds,
+        });
+      }
+    };
+
+    void loadNativeAd();
+    requestPositionUpdate();
 
     return () => {
       mountedRef.current = false;
+      detachPositionListeners();
+      plugin.hide({ slotId }).catch(() => {});
+      plugin.destroy({ slotId }).catch(() => {});
     };
-  }, [index]);
+  }, [index, location.pathname, location.search, location.hash, slotId]);
 
-  if (nativeAd) {
-    return (
-      <div
-        className="inline-product-ad card border-0 shadow-sm h-100"
-        data-testid="inline-product-ad-native"
-        style={{ borderRadius: 14, overflow: "hidden" }}
-      >
-        <div className="d-flex align-items-center justify-content-between px-3 pt-2">
-          <span className="badge bg-secondary-subtle text-secondary" style={{ fontSize: "0.6rem" }}>
-            Ad
-          </span>
-          {nativeAd.advertiser && (
-            <small className="text-muted text-truncate" style={{ maxWidth: "60%" }}>
-              {nativeAd.advertiser}
-            </small>
-          )}
-        </div>
-        {nativeAd.imageUrl && (
-          <img
-            src={nativeAd.imageUrl}
-            alt={nativeAd.headline || "Sponsored"}
-            className="w-100"
-            style={{ height: 160, objectFit: "cover" }}
-          />
-        )}
-        <div className="card-body">
-          <div className="d-flex align-items-center gap-2 mb-1">
-            {nativeAd.iconUrl && (
-              <img
-                src={nativeAd.iconUrl}
-                alt=""
-                style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }}
-              />
-            )}
-            <h6 className="fw-bold mb-0 text-truncate">{nativeAd.headline}</h6>
-          </div>
-          {nativeAd.body && <p className="text-muted small mb-2 lh-sm">{nativeAd.body}</p>}
-          {nativeAd.callToAction && (
-            <span className="btn btn-sm btn-primary-custom w-100">{nativeAd.callToAction}</span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // In-house labeled placeholder (default, non-breaking) slot.
   return (
     <div
+      ref={containerRef}
       className="inline-product-ad inline-product-ad--placeholder card border-0 shadow-sm h-100"
       data-testid="inline-product-ad-placeholder"
       style={{
-        borderRadius: 14,
-        background: "linear-gradient(135deg,#FFF8F4,#FFFFFF)",
-        border: "1px dashed #FFD2BB",
+        background: "#ffffff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 8,
+        height: INLINE_AD_HEIGHT_PX,
+        minHeight: INLINE_AD_HEIGHT_PX,
+        overflow: "hidden",
+        position: "relative",
       }}
     >
       <div className="card-body d-flex flex-column justify-content-center text-center py-4">
@@ -132,12 +254,12 @@ export default function InlineProductAd({ index = 0 }) {
         >
           Sponsored
         </span>
-        <i className="bi bi-megaphone-fill mb-2" style={{ fontSize: "1.6rem", color: "#FF6B35" }}></i>
+        <i className="bi bi-badge-ad mb-2" style={{ fontSize: "1.6rem", color: "#FF6B35" }}></i>
         <h6 className="fw-bold mb-1" style={{ color: "#2C3E50" }}>
-          Your ad could be here
+          Sponsored listing
         </h6>
         <p className="text-muted small mb-0 lh-sm">
-          In-feed ad slot · advertise with GoodOne
+          Native ad slot
         </p>
       </div>
     </div>

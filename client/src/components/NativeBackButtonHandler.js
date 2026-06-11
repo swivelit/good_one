@@ -24,12 +24,15 @@ export const isSafeInternalPath = (path) => {
 
 export const getNativeBackTarget = ({
   pathname = '/',
+  search = '',
+  hash = '',
   state = null,
   canGoBack = false,
   historyLength = 0,
   userRole = null,
 } = {}) => {
   const safeFrom = isSafeInternalPath(state?.from) ? state.from.trim() : null;
+  const hasSearchOrHash = Boolean(search || hash);
 
   if (pathname.startsWith('/products/')) {
     return {
@@ -43,6 +46,14 @@ export const getNativeBackTarget = ({
     return {
       action: 'navigate',
       to: safeFrom || '/browse',
+      replace: true,
+    };
+  }
+
+  if ((pathname === '/' || pathname === '/browse') && hasSearchOrHash) {
+    return {
+      action: 'navigate',
+      to: pathname === '/' ? '/' : '/browse',
       replace: true,
     };
   }
@@ -92,6 +103,8 @@ export default function NativeBackButtonHandler() {
       const currentLocation = locationRef.current;
       const target = getNativeBackTarget({
         pathname: currentLocation.pathname,
+        search: currentLocation.search,
+        hash: currentLocation.hash,
         state: currentLocation.state,
         canGoBack: Boolean(event.canGoBack),
         historyLength: window.history?.length || 0,

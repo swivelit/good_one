@@ -58,10 +58,12 @@ const ENV_KEYS = [
   'REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID',
   'REACT_APP_ADMOB_ANDROID_REWARDED_ID',
   'REACT_APP_ADMOB_ANDROID_APP_OPEN_ID',
+  'REACT_APP_ADMOB_ANDROID_NATIVE_ID',
   'REACT_APP_ADMOB_IOS_BANNER_ID',
   'REACT_APP_ADMOB_IOS_INTERSTITIAL_ID',
   'REACT_APP_ADMOB_IOS_REWARDED_ID',
   'REACT_APP_ADMOB_IOS_APP_OPEN_ID',
+  'REACT_APP_ADMOB_IOS_NATIVE_ID',
   'REACT_APP_ADMOB_PRODUCT_DETAIL_INTERSTITIAL_INTERVAL',
   'REACT_APP_ADMOB_TEST_DEVICE_IDS',
 ];
@@ -109,6 +111,10 @@ test('test mode uses Google demo IDs for supported formats', () => {
     adId: 'ca-app-pub-3940256099942544/1033173712',
     configured: true,
   });
+  expect(getAdMobAdUnitConfig(ADMOB_FORMATS.NATIVE)).toMatchObject({
+    adId: 'ca-app-pub-3940256099942544/2247696110',
+    configured: true,
+  });
 });
 
 test('iOS test mode uses Google demo iOS ad unit IDs', () => {
@@ -133,6 +139,7 @@ test('production mode requires env production IDs', () => {
   process.env.NODE_ENV = 'production';
   process.env.REACT_APP_USE_ADMOB_TEST_ADS = 'false';
   process.env.REACT_APP_ADMOB_ANDROID_BANNER_ID = 'ca-app-pub-1111222233334444/5555666677';
+  process.env.REACT_APP_ADMOB_ANDROID_NATIVE_ID = 'ca-app-pub-1111222233334444/9999000011';
   delete process.env.REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID;
 
   expect(isUsingAdMobTestAds()).toBe(false);
@@ -145,6 +152,12 @@ test('production mode requires env production IDs', () => {
   expect(getAdMobAdUnitConfig(ADMOB_FORMATS.INTERSTITIAL)).toMatchObject({
     adId: '',
     configured: false,
+    source: 'env-production',
+    useTestAds: false,
+  });
+  expect(getAdMobAdUnitConfig(ADMOB_FORMATS.NATIVE)).toMatchObject({
+    adId: 'ca-app-pub-1111222233334444/9999000011',
+    configured: true,
     source: 'env-production',
     useTestAds: false,
   });

@@ -26,6 +26,8 @@ let mockRouterPathname = '/';
 const androidResDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res');
 const androidBuildGradlePath = path.join(__dirname, '..', 'android', 'app', 'build.gradle');
 const mainActivityPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java', 'com', 'goodone', 'marketplace', 'MainActivity.java');
+const nativeAdPluginPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java', 'com', 'goodone', 'marketplace', 'ads', 'NativeAdPlugin.java');
+const nativeAdLayoutPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'layout', 'goodone_native_ad_view.xml');
 const LOCAL_VIDEO_ENV_KEYS = [
   'REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD',
   'REACT_APP_LOCAL_FLOATING_VIDEO_REPEAT_MS',
@@ -279,6 +281,28 @@ test('MainActivity includes immediate Play update support', () => {
   expect(mainActivity).toMatch(/DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS/);
 });
 
+test('MainActivity safe-area CSS event uses the expected String.format argument order', () => {
+  const mainActivity = fs.readFileSync(mainActivityPath, 'utf8');
+
+  expect(mainActivity).toMatch(
+    /String\.format\(Locale\.US,[\s\S]*?top,\s*right,\s*bottom,\s*left,\s*rawTop,\s*GOODONE_SAFE_AREA_CHANGE_EVENT\s*\)/
+  );
+});
+
+test('Android registers SDK-owned native in-feed ad plugin', () => {
+  const mainActivity = fs.readFileSync(mainActivityPath, 'utf8');
+  const nativeAdPlugin = fs.readFileSync(nativeAdPluginPath, 'utf8');
+  const nativeAdLayout = fs.readFileSync(nativeAdLayoutPath, 'utf8');
+
+  expect(mainActivity).toMatch(/registerPlugin\(NativeAdPlugin\.class\)/);
+  expect(nativeAdPlugin).toMatch(/@CapacitorPlugin\(name = "NativeAd"\)/);
+  expect(nativeAdPlugin).toMatch(/AdLoader\.Builder/);
+  expect(nativeAdPlugin).toMatch(/NativeAdView/);
+  expect(nativeAdPlugin).toMatch(/setNativeAd\(nativeAd\)/);
+  expect(nativeAdLayout).toMatch(/com\.google\.android\.gms\.ads\.nativead\.NativeAdView/);
+  expect(nativeAdLayout).toMatch(/com\.google\.android\.gms\.ads\.nativead\.MediaView/);
+});
+
 test('NativeBackButtonHandler returns product source path when it is safe', () => {
   expect(getNativeBackTarget({
     pathname: '/products/123',
@@ -315,6 +339,37 @@ test('NativeBackButtonHandler ignores unsafe external product source state', () 
 test('NativeBackButtonHandler minimizes on root browse path', () => {
   expect(getNativeBackTarget({
     pathname: '/browse',
+  })).toEqual({ action: 'minimize' });
+});
+
+test('NativeBackButtonHandler clears browse search instead of minimizing', () => {
+  expect(getNativeBackTarget({
+    pathname: '/browse',
+    search: '?search=phone',
+  })).toEqual({
+    action: 'navigate',
+    to: '/browse',
+    replace: true,
+  });
+});
+
+test('NativeBackButtonHandler clears root query and hash instead of minimizing', () => {
+  expect(getNativeBackTarget({
+    pathname: '/',
+    search: '?search=phone',
+    hash: '#top',
+  })).toEqual({
+    action: 'navigate',
+    to: '/',
+    replace: true,
+  });
+});
+
+test('NativeBackButtonHandler still minimizes on browse without query or hash', () => {
+  expect(getNativeBackTarget({
+    pathname: '/browse',
+    search: '',
+    hash: '',
   })).toEqual({ action: 'minimize' });
 });
 
@@ -551,10 +606,12 @@ const ADMOB_TEST_ENV_KEYS = [
   'REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID',
   'REACT_APP_ADMOB_ANDROID_REWARDED_ID',
   'REACT_APP_ADMOB_ANDROID_APP_OPEN_ID',
+  'REACT_APP_ADMOB_ANDROID_NATIVE_ID',
   'REACT_APP_ADMOB_IOS_BANNER_ID',
   'REACT_APP_ADMOB_IOS_INTERSTITIAL_ID',
   'REACT_APP_ADMOB_IOS_REWARDED_ID',
   'REACT_APP_ADMOB_IOS_APP_OPEN_ID',
+  'REACT_APP_ADMOB_IOS_NATIVE_ID',
   'REACT_APP_ADMOB_TEST_DEVICE_IDS',
 ];
 
