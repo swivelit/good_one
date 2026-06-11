@@ -11,6 +11,14 @@ APK_TARGET="$OUTPUT_DIR/goodone-debug.apk"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org/}"
 USE_ADMOB_TEST_ADS="${REACT_APP_USE_ADMOB_TEST_ADS:-true}"
 
+if [ "${ALLOW_LIVE_ADS_IN_DEBUG:-false}" != "true" ]; then
+  if [ "${REACT_APP_USE_ADMOB_TEST_ADS:-true}" = "false" ]; then
+    echo "WARNING: Debug APK builds use Google test ads by default."
+    echo "Set ALLOW_LIVE_ADS_IN_DEBUG=true only for explicit live-ad debug testing."
+  fi
+  USE_ADMOB_TEST_ADS=true
+fi
+
 export_android_version_env() {
   local gradle_file="$ANDROID_DIR/app/build.gradle"
   local version_code
@@ -135,7 +143,7 @@ adb install -r "$APK_TARGET"
 To uninstall old app first:
 adb uninstall $APP_ID
 
-For AdMob banner logs while testing:
+For AdMob logs while testing:
 cd "$CLIENT_DIR" && npm run logs:android:admob
 
 EOF2

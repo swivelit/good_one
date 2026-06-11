@@ -2,8 +2,10 @@ import { Capacitor } from '@capacitor/core';
 import {
   ADMOB_FORMATS,
   getAdMobAdUnitConfig,
+  isAdMobFullScreenAdShowing,
   isUsingAdMobTestAds,
   showAdMobBanner,
+  showAdMobInterstitial,
 } from './admob';
 import {
   APP_OPEN_COOLDOWN_MS,
@@ -21,6 +23,8 @@ import {
 } from './admob/cooldowns';
 import { isAdMobDebugPanelEnabled } from '../components/AdMobDebugPanel';
 
+const mockAdMobListeners = {};
+
 jest.mock('@capacitor/core', () => ({
   Capacitor: {
     isNativePlatform: jest.fn(() => false),
@@ -32,10 +36,16 @@ jest.mock('@capacitor-community/admob', () => ({
   AdMob: {
     initialize: jest.fn(() => Promise.resolve()),
     requestConsentInfo: jest.fn(() => Promise.resolve({ canRequestAds: true })),
+    showConsentForm: jest.fn(() => Promise.resolve({ canRequestAds: true })),
     showBanner: jest.fn(() => Promise.resolve()),
     hideBanner: jest.fn(() => Promise.resolve()),
     removeBanner: jest.fn(() => Promise.resolve()),
-    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    prepareInterstitial: jest.fn(() => Promise.resolve()),
+    showInterstitial: jest.fn(() => Promise.resolve()),
+    addListener: jest.fn((eventName, callback) => {
+      mockAdMobListeners[eventName] = callback;
+      return { remove: jest.fn() };
+    }),
   },
   BannerAdSize: {
     ADAPTIVE_BANNER: 'ADAPTIVE_BANNER',
@@ -48,6 +58,16 @@ jest.mock('@capacitor-community/admob', () => ({
     Loaded: 'Loaded',
     FailedToLoad: 'FailedToLoad',
     SizeChanged: 'SizeChanged',
+  },
+  InterstitialAdPluginEvents: {
+    Loaded: 'InterstitialLoaded',
+    FailedToLoad: 'InterstitialFailedToLoad',
+    Dismissed: 'InterstitialDismissed',
+    FailedToShow: 'InterstitialFailedToShow',
+    Showed: 'InterstitialShowed',
+  },
+  AdmobConsentStatus: {
+    REQUIRED: 'REQUIRED',
   },
 }));
 
@@ -87,6 +107,9 @@ beforeEach(() => {
   restoreEnv();
   jest.clearAllMocks();
   localStorage.clear();
+  Object.keys(mockAdMobListeners).forEach((eventName) => {
+    delete mockAdMobListeners[eventName];
+  });
   resetInterstitialState();
   resetAppOpenState();
   Capacitor.isNativePlatform.mockReturnValue(false);
@@ -240,6 +263,52 @@ test('interstitial cooldown blocks repeat shows until the minimum interval passe
     now: now + INTERSTITIAL_COOLDOWN_MS,
     placement: INTERSTITIAL_PLACEMENTS.PRODUCT_DETAIL_RETURN,
   })).toMatchObject({ allowed: true });
+});
+
+test('interstitial show dispatches fullscreen state events and clears them on dismiss', async () => {
+  Capacitor.isNativePlatform.mockReturnValue(true);
+  const events = [];
+  const handleShowing = (event) => events.push({ type: 'showing', detail: event.detail });
+  const handleHidden = (event) => events.push({ type: 'hidden', detail: event.detail });
+
+  window.addEventListener('goodone:admob-fullscreen-showing', handleShowing);
+  window.addEventListener('goodone:admob-fullscreen-hidden', handleHidden);
+
+  const result = await showAdMobInterstitial({
+    currentPath: '/browse',
+    placement: INTERSTITIAL_PLACEMENTS.PRODUCT_DETAIL_RETURN,
+  });
+
+  expect(result).toBe(true);
+  expect(isAdMobFullScreenAdShowing()).toBe(true);
+  expect(events).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      type: 'showing',
+      detail: expect.objectContaining({
+        format: ADMOB_FORMATS.INTERSTITIAL,
+        phase: 'loading',
+        showing: true,
+        useTestAds: true,
+      }),
+    }),
+  ]));
+
+  mockAdMobListeners.InterstitialDismissed();
+
+  expect(isAdMobFullScreenAdShowing()).toBe(false);
+  expect(events).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      type: 'hidden',
+      detail: expect.objectContaining({
+        format: ADMOB_FORMATS.INTERSTITIAL,
+        phase: 'dismissed',
+        showing: false,
+      }),
+    }),
+  ]));
+
+  window.removeEventListener('goodone:admob-fullscreen-showing', handleShowing);
+  window.removeEventListener('goodone:admob-fullscreen-hidden', handleHidden);
 });
 
 test('daily interstitial cap blocks the fourth show in the same day', () => {

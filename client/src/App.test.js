@@ -8,6 +8,10 @@ import API from './api';
 import App from './App';
 import AppVideoManager, {
   BANNER_ONLY_PHASE_MS,
+  GOODONE_ADMOB_FULLSCREEN_HIDDEN_EVENT,
+  GOODONE_ADMOB_FULLSCREEN_SHOWING_EVENT,
+  GOODONE_ADMOB_NATIVE_HIDDEN_EVENT,
+  GOODONE_ADMOB_NATIVE_VISIBLE_EVENT,
   LOCAL_FLOATING_VIDEO_STORAGE_KEY,
   LOCAL_VIDEO_DURATION_MS,
   POPUP_REPEAT_INTERVAL_MS,
@@ -25,9 +29,13 @@ const mockCapacitorAppListeners = {};
 let mockRouterPathname = '/';
 const androidResDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res');
 const androidBuildGradlePath = path.join(__dirname, '..', 'android', 'app', 'build.gradle');
+const androidManifestPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
 const mainActivityPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java', 'com', 'goodone', 'marketplace', 'MainActivity.java');
 const nativeAdPluginPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java', 'com', 'goodone', 'marketplace', 'ads', 'NativeAdPlugin.java');
 const nativeAdLayoutPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'layout', 'goodone_native_ad_view.xml');
+const debugBuildScriptPath = path.join(__dirname, '..', '..', 'scripts', 'build-android-apk.sh');
+const releaseBuildScriptPath = path.join(__dirname, '..', '..', 'scripts', 'build-android_release-apk.sh');
+const debugLaunchScriptPath = path.join(__dirname, '..', '..', 'launch-debug_apk.sh');
 const LOCAL_VIDEO_ENV_KEYS = [
   'REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD',
   'REACT_APP_LOCAL_FLOATING_VIDEO_REPEAT_MS',
@@ -296,11 +304,86 @@ test('Android registers SDK-owned native in-feed ad plugin', () => {
 
   expect(mainActivity).toMatch(/registerPlugin\(NativeAdPlugin\.class\)/);
   expect(nativeAdPlugin).toMatch(/@CapacitorPlugin\(name = "NativeAd"\)/);
+  expect(nativeAdPlugin).toMatch(/MobileAds\.initialize/);
   expect(nativeAdPlugin).toMatch(/AdLoader\.Builder/);
   expect(nativeAdPlugin).toMatch(/NativeAdView/);
   expect(nativeAdPlugin).toMatch(/setNativeAd\(nativeAd\)/);
   expect(nativeAdLayout).toMatch(/com\.google\.android\.gms\.ads\.nativead\.NativeAdView/);
   expect(nativeAdLayout).toMatch(/com\.google\.android\.gms\.ads\.nativead\.MediaView/);
+});
+
+test('NativeAdPlugin keeps blank native ads invisible unless renderable', () => {
+  const nativeAdPlugin = fs.readFileSync(nativeAdPluginPath, 'utf8');
+
+  expect(nativeAdPlugin).toMatch(/private boolean renderable = false/);
+  expect(nativeAdPlugin).toMatch(/renderFailureReason/);
+  expect(nativeAdPlugin).toMatch(/slot\.loaded && slot\.renderable && slot\.showRequested && slot\.viewportVisible/);
+  expect(nativeAdPlugin).toMatch(/missing-headline/);
+  expect(nativeAdPlugin).toMatch(/missing-secondary-asset/);
+  expect(nativeAdPlugin).toMatch(/View\.GONE/);
+});
+
+test('NativeAdPlugin logs asset diagnostics and AdMob lifecycle callbacks', () => {
+  const nativeAdPlugin = fs.readFileSync(nativeAdPluginPath, 'utf8');
+
+  expect(nativeAdPlugin).toMatch(/GoodOneNativeAd/);
+  expect(nativeAdPlugin).toMatch(/headlinePresent/);
+  expect(nativeAdPlugin).toMatch(/bodyPresent/);
+  expect(nativeAdPlugin).toMatch(/ctaPresent/);
+  expect(nativeAdPlugin).toMatch(/iconPresent/);
+  expect(nativeAdPlugin).toMatch(/advertiserPresent/);
+  expect(nativeAdPlugin).toMatch(/mediaPresent/);
+  expect(nativeAdPlugin).toMatch(/hasVideoContent/);
+  expect(nativeAdPlugin).toMatch(/getResponseId/);
+  expect(nativeAdPlugin).toMatch(/getMediationAdapterClassName/);
+  expect(nativeAdPlugin).toMatch(/onAdLoaded/);
+  expect(nativeAdPlugin).toMatch(/onAdFailedToLoad/);
+  expect(nativeAdPlugin).toMatch(/onAdImpression/);
+  expect(nativeAdPlugin).toMatch(/onAdClicked/);
+  expect(nativeAdPlugin).toMatch(/onAdOpened/);
+  expect(nativeAdPlugin).toMatch(/onAdClosed/);
+});
+
+test('Native ad layout keeps attribution, headline, and CTA outside optional media', () => {
+  const nativeAdLayout = fs.readFileSync(nativeAdLayoutPath, 'utf8');
+  const attributionIndex = nativeAdLayout.indexOf('goodone_native_ad_attribution');
+  const headlineIndex = nativeAdLayout.indexOf('goodone_native_ad_headline');
+  const ctaIndex = nativeAdLayout.indexOf('goodone_native_ad_call_to_action');
+  const mediaContainerIndex = nativeAdLayout.indexOf('goodone_native_ad_media_container');
+
+  expect(attributionIndex).toBeGreaterThan(-1);
+  expect(headlineIndex).toBeGreaterThan(-1);
+  expect(ctaIndex).toBeGreaterThan(-1);
+  expect(mediaContainerIndex).toBeGreaterThan(-1);
+  expect(attributionIndex).toBeLessThan(mediaContainerIndex);
+  expect(headlineIndex).toBeLessThan(mediaContainerIndex);
+  expect(ctaIndex).toBeLessThan(mediaContainerIndex);
+  expect(nativeAdLayout).toMatch(/android:id="@\+id\/goodone_native_ad_media_container"[\s\S]*android:visibility="gone"/);
+  const mediaContainerTag = nativeAdLayout.match(/<FrameLayout[\s\S]*?goodone_native_ad_media_container[\s\S]*?>/)?.[0] || '';
+  expect(mediaContainerTag).toMatch(/android:layout_height="104dp"/);
+  expect(mediaContainerTag).not.toMatch(/android:layout_height="match_parent"/);
+});
+
+test('Android manifest enables hardware acceleration for AdMob rendering', () => {
+  const manifest = fs.readFileSync(androidManifestPath, 'utf8');
+
+  expect(manifest).toMatch(/<application[\s\S]*android:hardwareAccelerated="true"/);
+  expect(manifest).toMatch(/<activity[\s\S]*android:name="\.MainActivity"[\s\S]*android:hardwareAccelerated="true"/);
+});
+
+test('Android build scripts keep debug test ads and require a release native ID', () => {
+  const debugBuildScript = fs.readFileSync(debugBuildScriptPath, 'utf8');
+  const releaseBuildScript = fs.readFileSync(releaseBuildScriptPath, 'utf8');
+  const launchScript = fs.readFileSync(debugLaunchScriptPath, 'utf8');
+
+  expect(debugBuildScript).toMatch(/ALLOW_LIVE_ADS_IN_DEBUG/);
+  expect(debugBuildScript).toMatch(/USE_ADMOB_TEST_ADS=true/);
+  expect(releaseBuildScript).toMatch(/REACT_APP_ADMOB_ANDROID_NATIVE_ID/);
+  expect(releaseBuildScript).toMatch(/Native Advanced ad ID must not match the banner ad ID/);
+  expect(launchScript).toMatch(/GoodOneNativeAd/);
+  expect(launchScript).toMatch(/MobileAds/);
+  expect(launchScript).toMatch(/chromium/);
+  expect(launchScript).toMatch(/screencap -p/);
 });
 
 test('NativeBackButtonHandler returns product source path when it is safe', () => {
@@ -383,7 +466,12 @@ test('AppVideoManager stays hidden on web', () => {
   expect(container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
 });
 
-test('local floating video is enabled by default on native Android', () => {
+test('local floating video is disabled by default on native Android', () => {
+  expect(isLocalFloatingVideoAdEnabled({
+    isNative: true,
+    platform: 'android',
+  })).toBe(false);
+  process.env.REACT_APP_ENABLE_LOCAL_FLOATING_VIDEO_AD = 'true';
   expect(isLocalFloatingVideoAdEnabled({
     isNative: true,
     platform: 'android',
@@ -571,7 +659,7 @@ const renderNativeAdMobPhase = async () => {
   return view;
 };
 
-const renderNativeLocalVideoPhase = async (options = {}) => {
+const renderNativeLocalVideoPhase = async (options = { enableLocalVideo: true }) => {
   const view = renderNativeVideoManager(options);
 
   await act(async () => {
@@ -737,7 +825,7 @@ test('AppVideoManager keeps local popup video hidden when disabled by env while 
   expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
 });
 
-test('AppVideoManager shows local popup video by default on native Android while keeping the bottom banner', async () => {
+test('AppVideoManager shows local popup video when explicitly enabled while keeping the bottom banner', async () => {
   const { container } = await renderNativeLocalVideoPhase();
 
   expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
@@ -822,6 +910,40 @@ test('AppVideoManager returns to local video after the AdMob phase without remov
   expect(AdMob.removeBanner).toHaveBeenCalledTimes(removeBannerCount);
   expect(container.querySelector('.floating-video-widget')).toBeInTheDocument();
   expectLastBannerAdId('ca-app-pub-3940256099942544/6300978111');
+});
+
+test('AppVideoManager hides local popup video when AdMob native or fullscreen events fire', async () => {
+  const nativeView = await renderNativeLocalVideoPhase();
+  expect(nativeView.container.querySelector('.floating-video-widget')).toBeInTheDocument();
+
+  act(() => {
+    window.dispatchEvent(new CustomEvent(GOODONE_ADMOB_NATIVE_VISIBLE_EVENT, {
+      detail: { slotId: 'native-slot-1' },
+    }));
+  });
+
+  expect(nativeView.container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+  nativeView.unmount();
+
+  const fullscreenView = await renderNativeLocalVideoPhase();
+  expect(fullscreenView.container.querySelector('.floating-video-widget')).toBeInTheDocument();
+
+  act(() => {
+    window.dispatchEvent(new CustomEvent(GOODONE_ADMOB_FULLSCREEN_SHOWING_EVENT, {
+      detail: { phase: 'loading' },
+    }));
+  });
+
+  expect(fullscreenView.container.querySelector('.floating-video-widget')).not.toBeInTheDocument();
+
+  act(() => {
+    window.dispatchEvent(new CustomEvent(GOODONE_ADMOB_FULLSCREEN_HIDDEN_EVENT, {
+      detail: { phase: 'dismissed' },
+    }));
+    window.dispatchEvent(new CustomEvent(GOODONE_ADMOB_NATIVE_HIDDEN_EVENT, {
+      detail: { slotId: 'native-slot-1' },
+    }));
+  });
 });
 
 test('AppVideoManager clears timers and removes banner on unmount', async () => {

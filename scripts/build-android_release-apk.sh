@@ -197,6 +197,7 @@ echo "REACT_APP_ANDROID_VERSION_CODE=$REACT_APP_ANDROID_VERSION_CODE"
 echo "REACT_APP_ANDROID_VERSION_NAME=$REACT_APP_ANDROID_VERSION_NAME"
 echo "REACT_APP_ADMOB_ANDROID_BANNER_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_BANNER_ID:-}")"
 echo "REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID:-}")"
+echo "REACT_APP_ADMOB_ANDROID_NATIVE_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_NATIVE_ID:-}")"
 echo "REACT_APP_ADMOB_ANDROID_REWARDED_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_REWARDED_ID:-}")"
 echo "REACT_APP_ADMOB_ANDROID_APP_OPEN_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_APP_OPEN_ID:-}")"
 echo "Do not upload this AAB if required production AdMob IDs are missing."
@@ -204,6 +205,13 @@ echo "Do not upload this AAB if required production AdMob IDs are missing."
 require_admob_release_id REACT_APP_ADMOB_ANDROID_BANNER_ID "banner"
 if is_interstitial_admob_enabled; then
   require_admob_release_id REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID "interstitial"
+fi
+require_admob_release_id REACT_APP_ADMOB_ANDROID_NATIVE_ID "native advanced"
+
+if [ "${REACT_APP_ADMOB_ANDROID_NATIVE_ID:-}" = "${REACT_APP_ADMOB_ANDROID_BANNER_ID:-}" ]; then
+  echo "ERROR: Native Advanced ad ID must not match the banner ad ID."
+  echo "Use a Native Advanced unit for REACT_APP_ADMOB_ANDROID_NATIVE_ID."
+  exit 1
 fi
 
 echo ""

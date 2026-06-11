@@ -53,6 +53,8 @@ export const DEFAULT_ADMOB_BANNER_HEIGHT_PX = MIN_ADAPTIVE_BANNER_HEIGHT_PX;
 const BANNER_LOAD_TIMEOUT_MS = 8000;
 const BANNER_HEIGHT_CSS_VARIABLE = "--goodone-admob-banner-height";
 const BANNER_LAYOUT_EVENT = "goodone:admob-banner-layout-change";
+export const GOODONE_ADMOB_FULLSCREEN_SHOWING_EVENT = "goodone:admob-fullscreen-showing";
+export const GOODONE_ADMOB_FULLSCREEN_HIDDEN_EVENT = "goodone:admob-fullscreen-hidden";
 const MAX_DIAGNOSTIC_EVENTS = 40;
 
 let admobModulePromise = null;
@@ -66,11 +68,13 @@ let bannerLoadTimeout = null;
 let lastKnownBannerHeightPx = DEFAULT_ADMOB_BANNER_HEIGHT_PX;
 let lastMeasuredBannerHeightPx = 0;
 let reservedBannerLayoutHeightPx = 0;
+let isFullScreenAdShowing = false;
 let diagnostics = {
   events: [],
   lastError: null,
 };
 const diagnosticSubscribers = new Set();
+const fullScreenAdSubscribers = new Set();
 
 export const isNativePlatform = isAdMobNativePlatform;
 
@@ -166,6 +170,58 @@ export const subscribeAdMobDiagnostics = (listener) => {
   return () => {
     diagnosticSubscribers.delete(listener);
   };
+};
+
+export const isAdMobFullScreenAdShowing = () => isFullScreenAdShowing;
+
+export const subscribeAdMobFullScreenAdState = (listener) => {
+  fullScreenAdSubscribers.add(listener);
+  listener(isFullScreenAdShowing);
+
+  return () => {
+    fullScreenAdSubscribers.delete(listener);
+  };
+};
+
+const dispatchAdMobFullScreenEvent = (eventName, detail = {}) => {
+  if (typeof window === "undefined") return;
+
+  window.dispatchEvent(new CustomEvent(eventName, { detail }));
+};
+
+const setAdMobFullScreenAdShowing = (nextValue, detail = {}) => {
+  isFullScreenAdShowing = Boolean(nextValue);
+  const eventDetail = {
+    showing: isFullScreenAdShowing,
+    ...sanitizeDiagnosticValue(detail),
+  };
+
+  dispatchAdMobFullScreenEvent(
+    isFullScreenAdShowing
+      ? GOODONE_ADMOB_FULLSCREEN_SHOWING_EVENT
+      : GOODONE_ADMOB_FULLSCREEN_HIDDEN_EVENT,
+    eventDetail
+  );
+
+  fullScreenAdSubscribers.forEach((listener) => {
+    try {
+      listener(isFullScreenAdShowing, eventDetail);
+    } catch {
+      // Fullscreen ad listeners are best-effort UI coordination.
+    }
+  });
+};
+
+const isLocalFloatingVideoActive = () => {
+  if (typeof document === "undefined") return false;
+
+  const widget = document.querySelector(".floating-video-widget");
+  if (!widget) return false;
+
+  const expanded = widget.classList?.contains("expanded");
+  const video = widget.querySelector?.("video");
+  const playing = Boolean(video && !video.paused && !video.ended && video.readyState > 2);
+  return Boolean(expanded || playing);
 };
 
 export const getProductionAdMobBannerAdUnitId = () => (
@@ -412,26 +468,47 @@ const registerAdMobListeners = (admobModule) => {
 
   addAdMobListener(admobModule, InterstitialAdPluginEvents?.Loaded, (info) => {
     interstitialStatus = "loaded";
-    logAdMobInfo("interstitial loaded", info);
+    logAdMobInfo("interstitial loaded", {
+      ...info,
+      fullScreenAdActive: isFullScreenAdShowing,
+    });
   });
 
   addAdMobListener(admobModule, InterstitialAdPluginEvents?.FailedToLoad, (error) => {
     interstitialStatus = "failed";
+    setAdMobFullScreenAdShowing(false, {
+      format: ADMOB_FORMATS.INTERSTITIAL,
+      phase: "load-failed",
+    });
     logAdMobError("interstitial load", error);
   });
 
   addAdMobListener(admobModule, InterstitialAdPluginEvents?.Showed, () => {
     interstitialStatus = "shown";
-    logAdMobInfo("interstitial shown");
+    setAdMobFullScreenAdShowing(true, {
+      format: ADMOB_FORMATS.INTERSTITIAL,
+      phase: "shown",
+    });
+    logAdMobInfo("interstitial shown", {
+      fullScreenAdActive: isFullScreenAdShowing,
+    });
   });
 
   addAdMobListener(admobModule, InterstitialAdPluginEvents?.Dismissed, () => {
     interstitialStatus = "dismissed";
+    setAdMobFullScreenAdShowing(false, {
+      format: ADMOB_FORMATS.INTERSTITIAL,
+      phase: "dismissed",
+    });
     logAdMobInfo("interstitial dismissed");
   });
 
   addAdMobListener(admobModule, InterstitialAdPluginEvents?.FailedToShow, (error) => {
     interstitialStatus = "failed";
+    setAdMobFullScreenAdShowing(false, {
+      format: ADMOB_FORMATS.INTERSTITIAL,
+      phase: "show-failed",
+    });
     logAdMobError("interstitial show", error);
   });
 
@@ -686,6 +763,10 @@ export const removeAdMobBanner = async () => {
 export const loadAdMobInterstitial = async () => {
   if (!isAdMobNativePlatform()) {
     interstitialStatus = "skipped";
+    setAdMobFullScreenAdShowing(false, {
+      format: ADMOB_FORMATS.INTERSTITIAL,
+      phase: "non-native-skip",
+    });
     logAdMobSkip("interstitial skipped on non-native platform", {
       platform: getAdMobPlatform(),
     });
@@ -695,6 +776,10 @@ export const loadAdMobInterstitial = async () => {
   const config = getConfiguredAdUnit(ADMOB_FORMATS.INTERSTITIAL);
   if (!config) {
     interstitialStatus = "skipped";
+    setAdMobFullScreenAdShowing(false, {
+      format: ADMOB_FORMATS.INTERSTITIAL,
+      phase: "missing-config",
+    });
     return false;
   }
 
@@ -703,11 +788,25 @@ export const loadAdMobInterstitial = async () => {
     const initialized = await initializeAdMob();
     if (!admobModule?.AdMob?.prepareInterstitial || !initialized) {
       interstitialStatus = "unsupported";
+      setAdMobFullScreenAdShowing(false, {
+        adId: config.adId,
+        format: ADMOB_FORMATS.INTERSTITIAL,
+        phase: "unsupported",
+        source: config.source,
+        useTestAds: config.useTestAds,
+      });
       logAdMobSkip("interstitial skipped because prepareInterstitial is unavailable");
       return false;
     }
 
     interstitialStatus = "loading";
+    setAdMobFullScreenAdShowing(true, {
+      adId: config.adId,
+      format: ADMOB_FORMATS.INTERSTITIAL,
+      phase: "loading",
+      source: config.source,
+      useTestAds: config.useTestAds,
+    });
     logAdMobInfo("interstitial load requested", {
       adId: config.adId,
       source: config.source,
@@ -721,6 +820,13 @@ export const loadAdMobInterstitial = async () => {
     return true;
   } catch (error) {
     interstitialStatus = "failed";
+    setAdMobFullScreenAdShowing(false, {
+      adId: config.adId,
+      format: ADMOB_FORMATS.INTERSTITIAL,
+      phase: "load-exception",
+      source: config.source,
+      useTestAds: config.useTestAds,
+    });
     logAdMobError("load interstitial", error);
     return false;
   }
@@ -740,18 +846,53 @@ export const showAdMobInterstitial = async ({
     return false;
   }
 
+  if (isLocalFloatingVideoActive()) {
+    logAdMobSkip("interstitial blocked while local floating video is active", {
+      currentPath,
+      placement,
+    });
+    return false;
+  }
+
   try {
     const admobModule = await loadAdMobModule();
     const loaded = await loadAdMobInterstitial();
-    if (!loaded || !admobModule?.AdMob?.showInterstitial) return false;
+    if (!loaded || !admobModule?.AdMob?.showInterstitial) {
+      setAdMobFullScreenAdShowing(false, {
+        format: ADMOB_FORMATS.INTERSTITIAL,
+        phase: "show-skipped",
+        placement,
+      });
+      return false;
+    }
 
-    logAdMobInfo("interstitial show requested", { currentPath, placement });
+    const config = getAdMobAdUnitConfig(ADMOB_FORMATS.INTERSTITIAL);
+    logAdMobInfo("interstitial show requested", {
+      adId: config.adId,
+      currentPath,
+      placement,
+      source: config.source,
+      useTestAds: config.useTestAds,
+    });
     await admobModule.AdMob.showInterstitial();
     recordInterstitialShown();
     interstitialStatus = "shown";
+    setAdMobFullScreenAdShowing(true, {
+      adId: config.adId,
+      format: ADMOB_FORMATS.INTERSTITIAL,
+      phase: "show-resolved",
+      placement,
+      source: config.source,
+      useTestAds: config.useTestAds,
+    });
     return true;
   } catch (error) {
     interstitialStatus = "failed";
+    setAdMobFullScreenAdShowing(false, {
+      format: ADMOB_FORMATS.INTERSTITIAL,
+      phase: "show-exception",
+      placement,
+    });
     logAdMobError("show interstitial", error, { currentPath, placement });
     return false;
   }

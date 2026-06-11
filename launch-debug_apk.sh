@@ -5,7 +5,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ID="com.goodone.marketplace"
 APK_PATH="$ROOT_DIR/dist/goodone-debug.apk"
 LOG_PATH="$ROOT_DIR/dist/goodone-debug-logcat.txt"
+SCREENSHOT_PATH="$ROOT_DIR/dist/goodone-debug-screenshot.png"
 SHARED_PRODUCT_URL="${SHARED_PRODUCT_URL:-}"
+LOG_FILTER="GoodOne|GoodOneNativeAd|AdMob|MobileAds|GoogleMobileAds|Ads|NativeAd|AdLoader|AdView|AndroidRuntime|FATAL EXCEPTION|WebView|chromium|MediaCodec|OMX|ExoPlayer|Capacitor"
 
 echo "Building GoodOne debug APK..."
 bash "$ROOT_DIR/scripts/build-android-apk.sh"
@@ -39,10 +41,16 @@ sleep 5
 
 mkdir -p "$(dirname "$LOG_PATH")"
 adb -s "$DEVICE_ID" logcat -d -v time \
-  | grep -Ei "GoodOne|Capacitor|auth|forgot|otp|password|AndroidRuntime|FATAL EXCEPTION" \
+  | grep -Ei "$LOG_FILTER" \
   > "$LOG_PATH" || true
 
 echo "Captured filtered logcat output at $LOG_PATH"
+
+if adb -s "$DEVICE_ID" exec-out screencap -p > "$SCREENSHOT_PATH"; then
+  echo "Captured device screenshot at $SCREENSHOT_PATH"
+else
+  echo "WARNING: Could not capture device screenshot."
+fi
 
 if [ -x "$ROOT_DIR/scripts/test-android-app-links.sh" ]; then
   echo "Running Android App Links verification..."

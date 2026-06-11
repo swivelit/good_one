@@ -8,6 +8,8 @@ import {
 } from "../services/admob/config";
 
 const INLINE_AD_HEIGHT_PX = 312;
+export const GOODONE_ADMOB_NATIVE_VISIBLE_EVENT = "goodone:admob-native-visible";
+export const GOODONE_ADMOB_NATIVE_HIDDEN_EVENT = "goodone:admob-native-hidden";
 
 let slotCounter = 0;
 let registeredNativeAdPlugin = null;
@@ -85,11 +87,20 @@ const warnNativeAdEvent = (message, error, details = {}) => {
   });
 };
 
+const dispatchNativeAdEvent = (eventName, detail) => {
+  if (typeof window === "undefined") return;
+
+  window.dispatchEvent(new CustomEvent(eventName, { detail }));
+};
+
 export default function InlineProductAd({ index = 0 }) {
   const location = useLocation();
   const containerRef = useRef(null);
   const mountedRef = useRef(false);
   const rafRef = useRef(0);
+  const nativeAdActiveRef = useRef(false);
+  const slotCreatedRef = useRef(false);
+  const slotRenderableRef = useRef(false);
   const slotId = useMemo(() => {
     slotCounter += 1;
     return `inline-product-ad-${index}-${slotCounter}`;
@@ -120,18 +131,120 @@ export default function InlineProductAd({ index = 0 }) {
     }
 
     const frame = () => getFrameForElement(containerRef.current);
-    const updateNativePosition = () => {
-      if (!mountedRef.current) return;
+    const markNativeAdActive = (phase, details = {}) => {
+      if (nativeAdActiveRef.current) return;
+      nativeAdActiveRef.current = true;
+      dispatchNativeAdEvent(GOODONE_ADMOB_NATIVE_VISIBLE_EVENT, {
+        slotId,
+        phase,
+        ...details,
+      });
+    };
+
+    const markNativeAdHidden = (reason, details = {}) => {
+      if (!nativeAdActiveRef.current) return;
+      nativeAdActiveRef.current = false;
+      dispatchNativeAdEvent(GOODONE_ADMOB_NATIVE_HIDDEN_EVENT, {
+        slotId,
+        reason,
+        ...details,
+      });
+    };
+
+    const hideNativeSlot = async (reason) => {
+      markNativeAdHidden(reason, { adId: maskedAdId });
+      if (!slotCreatedRef.current) return;
+
+      try {
+        await plugin.hide({ slotId });
+      } catch (error) {
+        warnNativeAdEvent("native ad hide failed", error, { slotId, adId: maskedAdId, reason });
+      }
+    };
+
+    const destroyNativeSlot = async (reason, details = {}) => {
+      markNativeAdHidden(reason, { adId: maskedAdId, ...details });
+      slotRenderableRef.current = false;
+
+      try {
+        if (slotCreatedRef.current) {
+          await plugin.hide({ slotId }).catch(() => {});
+          await plugin.destroy({ slotId });
+        }
+      } catch (error) {
+        warnNativeAdEvent("native ad destroy failed", error, { slotId, adId: maskedAdId, reason });
+      } finally {
+        slotCreatedRef.current = false;
+      }
+    };
+
+    const showNativeSlot = async (nextFrame) => {
+      if (!mountedRef.current || !slotCreatedRef.current || !slotRenderableRef.current) return false;
+      if (!nextFrame?.visible) {
+        await hideNativeSlot("out-of-viewport");
+        return false;
+      }
+
+      try {
+        const showResult = await plugin.show({
+          slotId,
+          ...nextFrame,
+        });
+
+        if (showResult?.renderable === false) {
+          await destroyNativeSlot("show-returned-not-renderable", {
+            renderFailureReason: showResult.renderFailureReason,
+          });
+          return false;
+        }
+
+        markNativeAdActive("shown", { adId: maskedAdId });
+        return true;
+      } catch (error) {
+        warnNativeAdEvent("native ad show failed; destroying slot", error, { slotId, adId: maskedAdId });
+        await destroyNativeSlot("show-failed");
+        return false;
+      }
+    };
+
+    const updateNativePosition = async () => {
+      if (!mountedRef.current || !slotCreatedRef.current) return;
 
       const nextFrame = frame();
       if (!nextFrame) return;
 
-      plugin.updatePosition({
-        slotId,
-        ...nextFrame,
-      }).catch((error) => {
-        warnNativeAdEvent("native ad position update failed", error, { slotId, adId: maskedAdId });
-      });
+      if (!slotRenderableRef.current) return;
+
+      if (!nextFrame.visible) {
+        await hideNativeSlot(
+          document.visibilityState === "hidden" ? "document-hidden" : "out-of-viewport"
+        );
+        return;
+      }
+
+      if (!nativeAdActiveRef.current) {
+        await showNativeSlot(nextFrame);
+        return;
+      }
+
+      try {
+        const positionResult = await plugin.updatePosition({
+          slotId,
+          ...nextFrame,
+        });
+
+        if (positionResult?.renderable === false) {
+          await destroyNativeSlot("position-returned-not-renderable", {
+            renderFailureReason: positionResult.renderFailureReason,
+          });
+        }
+      } catch (error) {
+        warnNativeAdEvent("native ad position update failed; destroying slot", error, {
+          slotId,
+          adId: maskedAdId,
+        });
+        await destroyNativeSlot("position-update-failed");
+      }
     };
 
     const requestPositionUpdate = () => {
@@ -195,6 +308,8 @@ export default function InlineProductAd({ index = 0 }) {
           useTestAds: config.useTestAds,
           ...initialFrame,
         });
+        slotCreatedRef.current = true;
+        markNativeAdActive("loading", { adId: maskedAdId });
 
         logNativeAdEvent("native ad load requested", {
           slotId,
@@ -203,13 +318,24 @@ export default function InlineProductAd({ index = 0 }) {
           useTestAds: config.useTestAds,
         });
 
-        await plugin.load({ slotId, adId: config.adId });
+        const loadResult = await plugin.load({ slotId, adId: config.adId });
         if (!mountedRef.current) return;
 
-        await plugin.show({
-          slotId,
-          ...frame(),
-        });
+        if (loadResult?.renderable !== true) {
+          const reason = loadResult?.renderFailureReason || "not-renderable";
+          logNativeAdEvent("native ad was not renderable; keeping placeholder", {
+            slotId,
+            adId: maskedAdId,
+            reason,
+            source: config.source,
+            useTestAds: config.useTestAds,
+          });
+          await destroyNativeSlot(reason, { renderable: false });
+          return;
+        }
+
+        slotRenderableRef.current = true;
+        await showNativeSlot(frame());
         requestPositionUpdate();
       } catch (error) {
         warnNativeAdEvent("native ad load failed; keeping placeholder", error, {
@@ -218,6 +344,7 @@ export default function InlineProductAd({ index = 0 }) {
           source: config.source,
           useTestAds: config.useTestAds,
         });
+        await destroyNativeSlot("load-failed");
       }
     };
 
@@ -227,6 +354,7 @@ export default function InlineProductAd({ index = 0 }) {
     return () => {
       mountedRef.current = false;
       detachPositionListeners();
+      markNativeAdHidden("unmount", { adId: maskedAdId });
       plugin.hide({ slotId }).catch(() => {});
       plugin.destroy({ slotId }).catch(() => {});
     };

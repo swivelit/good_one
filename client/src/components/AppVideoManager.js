@@ -8,6 +8,10 @@ import {
   syncAdMobBannerLayoutForViewport,
 } from "../services/admob";
 
+export const GOODONE_ADMOB_NATIVE_VISIBLE_EVENT = "goodone:admob-native-visible";
+export const GOODONE_ADMOB_NATIVE_HIDDEN_EVENT = "goodone:admob-native-hidden";
+export const GOODONE_ADMOB_FULLSCREEN_SHOWING_EVENT = "goodone:admob-fullscreen-showing";
+export const GOODONE_ADMOB_FULLSCREEN_HIDDEN_EVENT = "goodone:admob-fullscreen-hidden";
 export const POPUP_REPEAT_INTERVAL_MS = 20000;
 export const LOCAL_VIDEO_DURATION_MS = 10000;
 export const BANNER_ONLY_PHASE_MS = POPUP_REPEAT_INTERVAL_MS - LOCAL_VIDEO_DURATION_MS;
@@ -71,7 +75,7 @@ export const isLocalFloatingVideoAdEnabled = ({
     return true;
   }
 
-  return true;
+  return false;
 };
 
 const parseTimingEnvMs = (value, fallback, minimum) => {
@@ -211,11 +215,14 @@ export default function AppVideoManager() {
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLocalVideoDismissed, setIsLocalVideoDismissed] = useState(false);
+  const [isAdMobAdActive, setIsAdMobAdActive] = useState(false);
   const cycleTimerRef = useRef(null);
   const showAdMobPhaseRef = useRef(() => {});
   const showLocalVideoPhaseRef = useRef(() => {});
   const isAdMobBannerVisibleRef = useRef(false);
   const adMobBannerRequestIdRef = useRef(0);
+  const nativeAdSlotsRef = useRef(new Set());
+  const isAdMobFullscreenActiveRef = useRef(false);
   const widgetRef = useRef(null);
   const floatingVideoRef = useRef(null);
   const dragRef = useRef(null);
@@ -223,7 +230,8 @@ export default function AppVideoManager() {
   const canShowLocalFloatingVideo =
     isLocalFloatingVideoEnabled &&
     isLocalVideoRouteAllowed &&
-    !isLocalVideoDismissed;
+    !isLocalVideoDismissed &&
+    !isAdMobAdActive;
 
   const getWidgetSize = useCallback(() => {
     const rect = widgetRef.current?.getBoundingClientRect();
@@ -333,6 +341,12 @@ export default function AppVideoManager() {
     dragRef.current = null;
   }, [muteFloatingAudio]);
 
+  const suppressLocalFloatingVideoForAdMob = useCallback(() => {
+    clearCycleTimers();
+    resetFloatingInteraction();
+    setShowFloating(false);
+  }, [clearCycleTimers, resetFloatingInteraction]);
+
   const ensureBottomAdMobBanner = useCallback(() => {
     const status = getAdMobBannerStatus();
     if (status === "loading" || status === "loaded") return;
@@ -361,7 +375,7 @@ export default function AppVideoManager() {
     setShowFloating(false);
     ensureBottomAdMobBanner();
 
-    if (!canShowLocalFloatingVideo) return;
+    if (!canShowLocalFloatingVideo || isAdMobAdActive) return;
 
     const { bannerOnlyPhaseMs } = getLocalFloatingVideoTiming();
     cycleTimerRef.current = setTimeout(() => {
@@ -372,6 +386,7 @@ export default function AppVideoManager() {
     clearCycleTimer,
     canShowLocalFloatingVideo,
     ensureBottomAdMobBanner,
+    isAdMobAdActive,
     isNative,
     resetFloatingInteraction,
   ]);
@@ -381,6 +396,7 @@ export default function AppVideoManager() {
     if (
       !isNative ||
       !canShowLocalFloatingVideo ||
+      isAdMobAdActive ||
       document.visibilityState !== "visible"
     ) return;
 
@@ -400,6 +416,7 @@ export default function AppVideoManager() {
     clearCycleTimer,
     canShowLocalFloatingVideo,
     ensureBottomAdMobBanner,
+    isAdMobAdActive,
     isNative,
     loadPosition,
     resetFloatingInteraction,
@@ -412,6 +429,62 @@ export default function AppVideoManager() {
   useEffect(() => {
     showLocalVideoPhaseRef.current = showLocalVideoPhase;
   }, [showLocalVideoPhase]);
+
+  useEffect(() => {
+    if (!isNative) return undefined;
+
+    const nativeAdSlots = nativeAdSlotsRef.current;
+    const updateAdMobActivityState = () => {
+      const nextActive = nativeAdSlots.size > 0 || isAdMobFullscreenActiveRef.current;
+      setIsAdMobAdActive(nextActive);
+      if (nextActive) {
+        suppressLocalFloatingVideoForAdMob();
+      }
+    };
+
+    const handleNativeVisible = (event) => {
+      const slotId = event?.detail?.slotId || "__native-ad";
+      nativeAdSlots.add(slotId);
+      updateAdMobActivityState();
+    };
+
+    const handleNativeHidden = (event) => {
+      const slotId = event?.detail?.slotId;
+      if (slotId) {
+        nativeAdSlots.delete(slotId);
+      } else {
+        nativeAdSlots.clear();
+      }
+      updateAdMobActivityState();
+    };
+
+    const handleFullscreenShowing = () => {
+      isAdMobFullscreenActiveRef.current = true;
+      updateAdMobActivityState();
+    };
+
+    const handleFullscreenHidden = () => {
+      isAdMobFullscreenActiveRef.current = false;
+      updateAdMobActivityState();
+    };
+
+    window.addEventListener(GOODONE_ADMOB_NATIVE_VISIBLE_EVENT, handleNativeVisible);
+    window.addEventListener(GOODONE_ADMOB_NATIVE_HIDDEN_EVENT, handleNativeHidden);
+    window.addEventListener(GOODONE_ADMOB_FULLSCREEN_SHOWING_EVENT, handleFullscreenShowing);
+    window.addEventListener(GOODONE_ADMOB_FULLSCREEN_HIDDEN_EVENT, handleFullscreenHidden);
+
+    return () => {
+      window.removeEventListener(GOODONE_ADMOB_NATIVE_VISIBLE_EVENT, handleNativeVisible);
+      window.removeEventListener(GOODONE_ADMOB_NATIVE_HIDDEN_EVENT, handleNativeHidden);
+      window.removeEventListener(GOODONE_ADMOB_FULLSCREEN_SHOWING_EVENT, handleFullscreenShowing);
+      window.removeEventListener(GOODONE_ADMOB_FULLSCREEN_HIDDEN_EVENT, handleFullscreenHidden);
+      nativeAdSlots.clear();
+      isAdMobFullscreenActiveRef.current = false;
+    };
+  }, [
+    isNative,
+    suppressLocalFloatingVideoForAdMob,
+  ]);
 
   const stopNativeVideoCycle = useCallback(() => {
     clearCycleTimers();

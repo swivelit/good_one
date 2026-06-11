@@ -1,6 +1,7 @@
 package com.goodone.marketplace.ads;
 
 import android.app.Activity;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,6 +22,8 @@ import com.google.android.gms.ads.AdListener;
 import com.google.android.gms.ads.AdLoader;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.LoadAdError;
+import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.ResponseInfo;
 import com.google.android.gms.ads.nativead.MediaView;
 import com.google.android.gms.ads.nativead.NativeAd;
 import com.google.android.gms.ads.nativead.NativeAdOptions;
@@ -31,10 +34,12 @@ import java.util.Map;
 
 @CapacitorPlugin(name = "NativeAd")
 public class NativeAdPlugin extends Plugin {
+    private static final String TAG = "GoodOneNativeAd";
     private static final String EVENT_LOADED = "nativeAdLoaded";
     private static final String EVENT_FAILED_TO_LOAD = "nativeAdFailedToLoad";
     private static final String EVENT_SHOWN = "nativeAdShown";
     private static final String EVENT_HIDDEN = "nativeAdHidden";
+    private static boolean mobileAdsInitializationStarted = false;
 
     private final Map<String, NativeAdSlot> slots = new HashMap<>();
 
@@ -85,6 +90,9 @@ public class NativeAdPlugin extends Plugin {
             String adId = call.getString("adId", slot.adId);
             slot.adId = adId;
 
+            initializeMobileAdsOnce();
+            logSlotState("load-request", slot, null);
+
             AdLoader adLoader = new AdLoader.Builder(getContext(), adId)
                 .forNativeAd(nativeAd -> runOnUiThread(() -> {
                     NativeAdSlot currentSlot = slots.get(slotId);
@@ -98,10 +106,16 @@ public class NativeAdPlugin extends Plugin {
                         currentSlot.nativeAd.destroy();
                     }
 
-                    currentSlot.nativeAd = nativeAd;
+                    currentSlot.nativeAd = null;
                     currentSlot.loaded = true;
-                    populateNativeAdView(currentSlot.adView, nativeAd);
+                    boolean renderable = populateNativeAdView(currentSlot, nativeAd);
+                    if (renderable) {
+                        currentSlot.nativeAd = nativeAd;
+                    } else {
+                        nativeAd.destroy();
+                    }
                     updateVisibility(currentSlot);
+                    logSlotState("load-complete", currentSlot, nativeAd);
 
                     JSObject result = slotResult(currentSlot);
                     notifyListeners(EVENT_LOADED, result);
@@ -112,13 +126,28 @@ public class NativeAdPlugin extends Plugin {
                     .build())
                 .withAdListener(new AdListener() {
                     @Override
+                    public void onAdLoaded() {
+                        runOnUiThread(() -> {
+                            NativeAdSlot currentSlot = slots.get(slotId);
+                            if (currentSlot != null) {
+                                logSlotState("onAdLoaded", currentSlot, currentSlot.nativeAd);
+                            } else {
+                                Log.i(TAG, "onAdLoaded slotId=" + slotId + " slotMissing=true");
+                            }
+                        });
+                    }
+
+                    @Override
                     public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
                         runOnUiThread(() -> {
                             NativeAdSlot currentSlot = slots.get(slotId);
                             if (currentSlot != null) {
                                 currentSlot.loaded = false;
+                                currentSlot.renderable = false;
+                                currentSlot.renderFailureReason = "load-failed:" + loadAdError.getCode();
                                 currentSlot.showRequested = false;
                                 updateVisibility(currentSlot);
+                                logSlotState("onAdFailedToLoad", currentSlot, currentSlot.nativeAd);
                             }
 
                             JSObject data = new JSObject();
@@ -128,6 +157,46 @@ public class NativeAdPlugin extends Plugin {
                             data.put("message", loadAdError.getMessage());
                             notifyListeners(EVENT_FAILED_TO_LOAD, data);
                             call.reject("Native ad failed to load", String.valueOf(loadAdError.getCode()), data);
+                        });
+                    }
+
+                    @Override
+                    public void onAdImpression() {
+                        runOnUiThread(() -> {
+                            NativeAdSlot currentSlot = slots.get(slotId);
+                            if (currentSlot != null) {
+                                logSlotState("onAdImpression", currentSlot, currentSlot.nativeAd);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onAdClicked() {
+                        runOnUiThread(() -> {
+                            NativeAdSlot currentSlot = slots.get(slotId);
+                            if (currentSlot != null) {
+                                logSlotState("onAdClicked", currentSlot, currentSlot.nativeAd);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onAdOpened() {
+                        runOnUiThread(() -> {
+                            NativeAdSlot currentSlot = slots.get(slotId);
+                            if (currentSlot != null) {
+                                logSlotState("onAdOpened", currentSlot, currentSlot.nativeAd);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onAdClosed() {
+                        runOnUiThread(() -> {
+                            NativeAdSlot currentSlot = slots.get(slotId);
+                            if (currentSlot != null) {
+                                logSlotState("onAdClosed", currentSlot, currentSlot.nativeAd);
+                            }
                         });
                     }
                 })
@@ -153,6 +222,7 @@ public class NativeAdPlugin extends Plugin {
             applyLayoutParams(slot);
             slot.showRequested = true;
             updateVisibility(slot);
+            logSlotState("show", slot, slot.nativeAd);
 
             JSObject result = slotResult(slot);
             notifyListeners(EVENT_SHOWN, result);
@@ -175,6 +245,7 @@ public class NativeAdPlugin extends Plugin {
             applyFrameFromCall(slot, call);
             applyLayoutParams(slot);
             updateVisibility(slot);
+            logSlotState("update-position", slot, slot.nativeAd);
             call.resolve(slotResult(slot));
         });
     }
@@ -193,6 +264,7 @@ public class NativeAdPlugin extends Plugin {
 
             slot.showRequested = false;
             updateVisibility(slot);
+            logSlotState("hide", slot, slot.nativeAd);
             JSObject result = slotResult(slot);
             notifyListeners(EVENT_HIDDEN, result);
             call.resolve(result);
@@ -222,7 +294,9 @@ public class NativeAdPlugin extends Plugin {
         super.handleOnDestroy();
     }
 
-    private void populateNativeAdView(NativeAdView adView, NativeAd nativeAd) {
+    private boolean populateNativeAdView(NativeAdSlot slot, NativeAd nativeAd) {
+        NativeAdView adView = slot.adView;
+        View mediaContainer = adView.findViewById(R.id.goodone_native_ad_media_container);
         MediaView mediaView = adView.findViewById(R.id.goodone_native_ad_media);
         TextView headlineView = adView.findViewById(R.id.goodone_native_ad_headline);
         TextView bodyView = adView.findViewById(R.id.goodone_native_ad_body);
@@ -237,50 +311,102 @@ public class NativeAdPlugin extends Plugin {
         adView.setIconView(iconView);
         adView.setAdvertiserView(advertiserView);
 
-        headlineView.setText(nativeAd.getHeadline());
-
-        if (nativeAd.getMediaContent() != null) {
-            mediaView.setMediaContent(nativeAd.getMediaContent());
-            mediaView.setVisibility(View.VISIBLE);
-        } else {
-            mediaView.setVisibility(View.INVISIBLE);
-        }
-
-        if (nativeAd.getBody() == null) {
-            bodyView.setVisibility(View.INVISIBLE);
-        } else {
-            bodyView.setText(nativeAd.getBody());
-            bodyView.setVisibility(View.VISIBLE);
-        }
-
-        if (nativeAd.getCallToAction() == null) {
-            callToActionView.setVisibility(View.INVISIBLE);
-        } else {
-            callToActionView.setText(nativeAd.getCallToAction());
-            callToActionView.setVisibility(View.VISIBLE);
-        }
-
+        String headline = trimToEmpty(nativeAd.getHeadline());
+        String body = trimToEmpty(nativeAd.getBody());
+        String callToAction = trimToEmpty(nativeAd.getCallToAction());
+        String advertiser = trimToEmpty(nativeAd.getAdvertiser());
         NativeAd.Image icon = nativeAd.getIcon();
-        if (icon == null) {
-            iconView.setVisibility(View.GONE);
+        boolean headlinePresent = hasText(headline);
+        boolean bodyPresent = hasText(body);
+        boolean ctaPresent = hasText(callToAction);
+        boolean iconPresent = icon != null && icon.getDrawable() != null;
+        boolean advertiserPresent = hasText(advertiser);
+        boolean mediaPresent = nativeAd.getMediaContent() != null;
+        boolean hasVideoContent = mediaPresent && nativeAd.getMediaContent().hasVideoContent();
+        boolean hasSecondaryAsset = bodyPresent || ctaPresent || iconPresent || advertiserPresent || mediaPresent;
+
+        slot.headlinePresent = headlinePresent;
+        slot.bodyPresent = bodyPresent;
+        slot.ctaPresent = ctaPresent;
+        slot.iconPresent = iconPresent;
+        slot.advertiserPresent = advertiserPresent;
+        slot.mediaPresent = mediaPresent;
+        slot.hasVideoContent = hasVideoContent;
+
+        if (headlinePresent) {
+            headlineView.setText(headline);
+            headlineView.setVisibility(View.VISIBLE);
         } else {
+            headlineView.setText("");
+            headlineView.setVisibility(View.GONE);
+        }
+
+        if (mediaPresent) {
+            mediaView.setImageScaleType(ImageView.ScaleType.CENTER_CROP);
+            mediaView.setMediaContent(nativeAd.getMediaContent());
+            mediaContainer.setVisibility(View.VISIBLE);
+        } else {
+            mediaView.setMediaContent(null);
+            mediaContainer.setVisibility(View.GONE);
+        }
+
+        if (bodyPresent) {
+            bodyView.setText(body);
+            bodyView.setVisibility(View.VISIBLE);
+        } else {
+            bodyView.setText("");
+            bodyView.setVisibility(View.GONE);
+        }
+
+        if (ctaPresent) {
+            callToActionView.setText(callToAction);
+            callToActionView.setVisibility(View.VISIBLE);
+        } else {
+            callToActionView.setText("");
+            callToActionView.setVisibility(View.GONE);
+        }
+
+        if (iconPresent) {
             iconView.setImageDrawable(icon.getDrawable());
             iconView.setVisibility(View.VISIBLE);
+        } else {
+            iconView.setImageDrawable(null);
+            iconView.setVisibility(View.GONE);
         }
 
-        if (nativeAd.getAdvertiser() == null) {
-            advertiserView.setVisibility(View.GONE);
-        } else {
-            advertiserView.setText(nativeAd.getAdvertiser());
+        if (advertiserPresent) {
+            advertiserView.setText(advertiser);
             advertiserView.setVisibility(View.VISIBLE);
+        } else {
+            advertiserView.setText("");
+            advertiserView.setVisibility(View.GONE);
+        }
+
+        if (!headlinePresent) {
+            slot.renderable = false;
+            slot.renderFailureReason = "missing-headline";
+            adView.setVisibility(View.INVISIBLE);
+            logSlotState("render-validation-failed", slot, nativeAd);
+            return false;
+        }
+
+        if (!hasSecondaryAsset) {
+            slot.renderable = false;
+            slot.renderFailureReason = "missing-secondary-asset";
+            adView.setVisibility(View.INVISIBLE);
+            logSlotState("render-validation-failed", slot, nativeAd);
+            return false;
         }
 
         adView.setNativeAd(nativeAd);
+        slot.renderable = true;
+        slot.renderFailureReason = "";
+        return true;
     }
 
     private void updateVisibility(NativeAdSlot slot) {
         slot.adView.setVisibility(
-            slot.loaded && slot.showRequested && slot.viewportVisible
+            slot.loaded && slot.renderable && slot.showRequested && slot.viewportVisible
                 ? View.VISIBLE
                 : View.INVISIBLE
         );
@@ -354,6 +480,11 @@ public class NativeAdPlugin extends Plugin {
             slot.nativeAd.destroy();
             slot.nativeAd = null;
         }
+        slot.loaded = false;
+        slot.renderable = false;
+        slot.renderFailureReason = "destroyed";
+        slot.showRequested = false;
+        updateVisibility(slot);
 
         ViewGroup parent = (ViewGroup) slot.adView.getParent();
         if (parent != null) {
@@ -365,12 +496,68 @@ public class NativeAdPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("slotId", slot.slotId);
         result.put("loaded", slot.loaded);
+        result.put("renderable", slot.renderable);
+        result.put("renderFailureReason", slot.renderFailureReason);
         result.put("visible", slot.adView.getVisibility() == View.VISIBLE);
         result.put("x", slot.xPx);
         result.put("y", slot.yPx);
         result.put("width", slot.widthPx);
         result.put("height", slot.heightPx);
         return result;
+    }
+
+    private void initializeMobileAdsOnce() {
+        if (mobileAdsInitializationStarted) return;
+        mobileAdsInitializationStarted = true;
+        MobileAds.initialize(getContext(), initializationStatus -> Log.i(TAG, "MobileAds.initialize complete"));
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private String trimToEmpty(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String maskAdId(String adId) {
+        if (adId == null || adId.trim().isEmpty()) return "missing";
+        String trimmed = adId.trim();
+        int slashIndex = trimmed.indexOf("/");
+        if (slashIndex < 0 || slashIndex == trimmed.length() - 1) return "configured";
+        String publisher = trimmed.substring(0, slashIndex);
+        String unit = trimmed.substring(slashIndex + 1);
+        String publisherSuffix = publisher.length() > 4 ? publisher.substring(publisher.length() - 4) : publisher;
+        String unitSuffix = unit.length() > 4 ? unit.substring(unit.length() - 4) : unit;
+        return "ca-app-pub-****" + publisherSuffix + "/****" + unitSuffix;
+    }
+
+    private void logSlotState(String event, NativeAdSlot slot, NativeAd nativeAd) {
+        ResponseInfo responseInfo = nativeAd != null ? nativeAd.getResponseInfo() : null;
+        String responseId = responseInfo != null ? responseInfo.getResponseId() : "missing";
+        String mediationAdapterClassName = responseInfo != null ? responseInfo.getMediationAdapterClassName() : "missing";
+        Log.i(
+            TAG,
+            event +
+                " slotId=" + slot.slotId +
+                " adId=" + maskAdId(slot.adId) +
+                " responseId=" + responseId +
+                " mediationAdapterClass=" + mediationAdapterClassName +
+                " headlinePresent=" + slot.headlinePresent +
+                " bodyPresent=" + slot.bodyPresent +
+                " ctaPresent=" + slot.ctaPresent +
+                " iconPresent=" + slot.iconPresent +
+                " advertiserPresent=" + slot.advertiserPresent +
+                " mediaPresent=" + slot.mediaPresent +
+                " hasVideoContent=" + slot.hasVideoContent +
+                " loaded=" + slot.loaded +
+                " renderable=" + slot.renderable +
+                " renderFailureReason=" + slot.renderFailureReason +
+                " showRequested=" + slot.showRequested +
+                " viewportVisible=" + slot.viewportVisible +
+                " visible=" + (slot.adView.getVisibility() == View.VISIBLE) +
+                " frame=" + slot.xPx + "," + slot.yPx + "," + slot.widthPx + "," + slot.heightPx
+        );
     }
 
     private void runOnUiThread(Runnable runnable) {
@@ -385,8 +572,17 @@ public class NativeAdPlugin extends Plugin {
         private String adId;
         private NativeAd nativeAd;
         private boolean loaded = false;
+        private boolean renderable = false;
+        private String renderFailureReason = "not-loaded";
         private boolean showRequested = false;
         private boolean viewportVisible = true;
+        private boolean headlinePresent = false;
+        private boolean bodyPresent = false;
+        private boolean ctaPresent = false;
+        private boolean iconPresent = false;
+        private boolean advertiserPresent = false;
+        private boolean mediaPresent = false;
+        private boolean hasVideoContent = false;
         private double scale = 1.0;
         private int xPx = 0;
         private int yPx = 0;
