@@ -70,7 +70,7 @@ describe('VendorDashboard renewal duration selection', () => {
   test('renews a product with the selected 7 day duration', async () => {
     render(<VendorDashboard />);
 
-    const renewButton = await screen.findByRole('button', { name: /renew 24 hours/i });
+    const renewButton = await screen.findByRole('button', { name: /renew/i });
     fireEvent.click(renewButton);
 
     fireEvent.change(screen.getByLabelText(/listing duration/i), {

@@ -353,9 +353,10 @@ export default function VendorDashboard() {
                             className="btn btn-sm btn-outline-success flex-fill"
                             style={{ fontSize: "0.75rem" }}
                             onClick={() => openRenewalSelector(p)}
-                            title={`Renew ${durationLabel(p.durationHours)}`}
+                            title="Renew listing (choose a new duration)"
+                            aria-label={`Renew ${p.title} and choose a new duration`}
                           >
-                            <i className="bi bi-arrow-repeat me-1"></i>Renew {durationLabel(p.durationHours)}
+                            <i className="bi bi-arrow-repeat me-1"></i>Renew…
                           </button>
                           <button
                             className="btn btn-sm btn-outline-danger"
@@ -445,8 +446,8 @@ export default function VendorDashboard() {
                               <button
                                 className="btn btn-sm btn-outline-success"
                                 onClick={() => openRenewalSelector(p)}
-                                title={`Renew ${durationLabel(p.durationHours)}`}
-                                aria-label={`Renew ${p.title} for ${durationLabel(p.durationHours)}`}
+                                title="Renew listing (choose a new duration)"
+                                aria-label={`Renew ${p.title} and choose a new duration`}
                               >
                                 <i className="bi bi-arrow-repeat"></i>
                               </button>
