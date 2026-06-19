@@ -176,7 +176,9 @@ Upload `dist/goodone-release.aab` to Google Play. Use
 `dist/goodone-release.apk` for local QA only. Do not click live AdMob ads during
 testing; use debug builds or configured test devices for ad testing.
 
-Android is currently `versionCode 1` and `versionName 1.0`. Every future Play Store upload must increment `versionCode`.
+The Android source of truth for `versionCode` and `versionName` is `client/android/app/build.gradle`. Every Play upload must use a `versionCode` greater than the highest one already present in Play Console; check Play Console before building or set `CURRENT_PLAY_VERSION_CODE` for the release script. Android builds require JDK 21.
+
+Meta Android App Events rollout and verification are documented in `client/META_SDK_ANDROID.md`. Release signing and Internal Testing notes are documented in `client/android/RELEASE_SIGNING.md`.
 
 ## iOS release setup
 

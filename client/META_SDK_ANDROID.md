@@ -124,3 +124,104 @@ The manifest should contain Meta metadata for `ApplicationId`, `ClientToken`, `A
 - Device offline/network blocked: connect the device and allow Meta endpoint access.
 
 Custom funnel events are intentionally outside this commit.
+
+## Debug And Release Verification
+
+Use JDK 21 for every Android build and verification command.
+
+Debug verification:
+
+```sh
+./scripts/verify-meta-sdk-android.sh --variant debug
+```
+
+Release verification after signed artifacts exist:
+
+```sh
+./scripts/verify-meta-sdk-android.sh --variant release --skip-build
+```
+
+Release build with verification:
+
+```sh
+./scripts/build-android_release-apk.sh
+```
+
+The release verifier checks the signed APK and AAB, confirms the release APK is
+not debuggable, verifies APK/AAB signatures, inspects the merged manifest, and
+uses bundletool for AAB base-manifest inspection when bundletool is available.
+
+## Current Runtime Flags
+
+GoodOne currently builds with:
+
+```properties
+META_AUTO_LOG_APP_EVENTS_ENABLED=true
+META_ADVERTISER_ID_COLLECTION_ENABLED=false
+```
+
+Changing either flag requires privacy-policy, Play Data Safety, and consent-flow
+review. In jurisdictions or contexts that require prior consent, automatic
+logging may need to be delayed until that consent exists. The existing Google
+UMP flow must not be treated as automatic consent for Meta.
+
+## Event Evidence Limits
+
+Android logs can prove local SDK initialization, automatic install/activation
+event generation, and local flush success. They do not prove Meta Events Manager
+received, attributed, or made the event available for campaign optimization.
+Dashboard confirmation still requires authenticated Meta access.
+
+Debug fresh-install evidence command:
+
+```sh
+REQUIRE_ADB=true \
+META_FRESH_INSTALL=true \
+META_REQUIRE_EVENT_EVIDENCE=true \
+META_LAUNCH_WAIT_SECONDS=15 \
+META_EVENT_WAIT_SECONDS=45 \
+SKIP_NPM_CI=true \
+./launch-debug_apk.sh
+```
+
+## Google Play Internal Testing
+
+For release validation, upload `dist/goodone-release.aab` to an Internal Testing
+track and install the Play-signed build from Google Play. This is the
+authoritative runtime path for the Google Play app-signing certificate. Local
+release APKs are signed by the upload key, so do not force local App Links
+expectations onto that APK when the live Digital Asset Links file contains only
+the Play app-signing certificate.
+
+## Meta Events Manager Workflow
+
+1. Confirm the Meta app dashboard Android package is `com.goodone.marketplace`.
+2. Confirm the default activity is `com.goodone.marketplace.MainActivity`.
+3. Confirm every relevant key hash is registered: debug, upload, and Google
+   Play app-signing.
+4. Install a fresh debug or Internal Testing build.
+5. Open Events Manager -> Test Events.
+6. Open GoodOne and confirm automatic install/activation events appear.
+
+## Business And Marketing Handoff
+
+Before campaign rollout, confirm:
+
+- Meta Business Portfolio owns or has access to the Meta app.
+- The ad account is connected to the app and has the right partner/agency
+  access.
+- Marketing has the App ID, package name, main activity, Play Store listing,
+  and current event status.
+- Marketing does not receive the App Secret, client token, signing keys,
+  keystore passwords, or release artifacts outside the approved release process.
+
+## Custom Events Not Implemented
+
+Automatic install and activation events are present. GoodOne does not currently
+send custom Meta events for completed registration, product/content view, search,
+seller contact, listing creation, or vendor registration.
+
+Add custom events only after a written event specification covers event names,
+parameters, consent timing, retention, Data Safety impact, and prohibited data.
+Do not send names, emails, phone numbers, chat contents, listing descriptions,
+or other user-entered personal data as Meta event names or parameters.

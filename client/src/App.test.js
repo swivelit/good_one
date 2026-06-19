@@ -259,13 +259,16 @@ test('native topbar CSS stays white without covering the header or AdMob bottom 
 
 test('Android launch theme stays light without native splash resources', () => {
   const styles = fs.readFileSync(path.join(androidResDir, 'values', 'styles.xml'), 'utf8');
+  const v29Styles = fs.readFileSync(path.join(androidResDir, 'values-v29', 'styles.xml'), 'utf8');
+  const v35Styles = fs.readFileSync(path.join(androidResDir, 'values-v35', 'styles.xml'), 'utf8');
 
   expect(styles).not.toMatch(/Theme\.SplashScreen/);
   expect(styles).not.toMatch(/@drawable\/splash/);
   expect(styles).not.toMatch(/DayNight\.NoActionBar/);
   expect(styles).toMatch(/Theme\.AppCompat\.Light\.NoActionBar/);
-  expect(styles).toMatch(/android:forceDarkAllowed/);
   expect(styles).toMatch(/@android:color\/white/);
+  expect(v29Styles).toMatch(/android:forceDarkAllowed/);
+  expect(v35Styles).toMatch(/android:windowOptOutEdgeToEdgeEnforcement/);
 });
 
 test('Android night resources do not include splash PNGs', () => {

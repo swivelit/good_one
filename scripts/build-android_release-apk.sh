@@ -7,6 +7,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLIENT_DIR="$ROOT_DIR/client"
 ANDROID_DIR="$CLIENT_DIR/android"
 OUTPUT_DIR="$ROOT_DIR/dist"
+JAVA_HELPER="$ROOT_DIR/scripts/lib/java21.sh"
 
 KEY_PROPERTIES="$ANDROID_DIR/key.properties"
 ADMOB_RELEASE_ENV_FILE="$CLIENT_DIR/.env.admob.release.local"
@@ -17,6 +18,8 @@ APK_SOURCE="$ANDROID_DIR/app/build/outputs/apk/release/app-release.apk"
 
 AAB_TARGET="$OUTPUT_DIR/goodone-release.aab"
 APK_TARGET="$OUTPUT_DIR/goodone-release.apk"
+AAB_SIGNATURE_LOG="$OUTPUT_DIR/goodone-release-aab-jarsigner.txt"
+APK_SIGNATURE_LOG="$OUTPUT_DIR/goodone-release-apk-apksigner.txt"
 
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org/}"
 
@@ -86,6 +89,75 @@ EOF
   fi
 }
 
+read_meta_release_setting() {
+  local name="$1"
+  local env_value="${!name:-}"
+
+  if [ -n "$env_value" ]; then
+    printf '%s' "$env_value"
+    return 0
+  fi
+
+  if [ -f "$ANDROID_DIR/meta.properties" ]; then
+    sed -nE "s/^[[:space:]]*${name}[[:space:]]*=[[:space:]]*(.*)[[:space:]]*$/\\1/p" \
+      "$ANDROID_DIR/meta.properties" | head -n 1
+  fi
+}
+
+require_meta_release_setting() {
+  local name="$1"
+  local value
+
+  value="$(read_meta_release_setting "$name" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+  if [ -z "$value" ]; then
+    echo "ERROR: Missing Meta Android release configuration: $name"
+    echo "Set it as a CI/local environment variable or in ignored client/android/meta.properties."
+    exit 1
+  fi
+
+  printf '%s' "$value"
+}
+
+validate_meta_release_config() {
+  local meta_app_id
+  local meta_client_token
+  local meta_auto_log
+  local meta_ad_id
+
+  meta_app_id="$(require_meta_release_setting META_APP_ID)"
+  meta_client_token="$(require_meta_release_setting META_CLIENT_TOKEN)"
+  meta_auto_log="$(require_meta_release_setting META_AUTO_LOG_APP_EVENTS_ENABLED)"
+  meta_ad_id="$(require_meta_release_setting META_ADVERTISER_ID_COLLECTION_ENABLED)"
+
+  if ! printf '%s' "$meta_app_id" | grep -Eq '^[0-9]+$' ||
+    [ "$meta_app_id" = "123456789012345" ] ||
+    printf '%s' "$meta_app_id" | grep -Eq '^0+$'; then
+    echo "ERROR: META_APP_ID must be numeric and non-placeholder."
+    exit 1
+  fi
+
+  case "$(printf '%s' "$meta_client_token" | tr '[:upper:]' '[:lower:]')" in
+    *replace*|*placeholder*|*example*)
+      echo "ERROR: META_CLIENT_TOKEN must be non-placeholder."
+      exit 1
+      ;;
+  esac
+
+  case "$meta_auto_log" in
+    true|false) ;;
+    *) echo "ERROR: META_AUTO_LOG_APP_EVENTS_ENABLED must be exactly true or false."; exit 1 ;;
+  esac
+
+  case "$meta_ad_id" in
+    true|false) ;;
+    *) echo "ERROR: META_ADVERTISER_ID_COLLECTION_ENABLED must be exactly true or false."; exit 1 ;;
+  esac
+
+  META_RELEASE_APP_ID="$meta_app_id"
+  META_RELEASE_AUTO_LOG="$meta_auto_log"
+  META_RELEASE_AD_ID="$meta_ad_id"
+}
+
 cat <<'BANNER'
 ========================================
  GoodOne Android Release Build
@@ -109,6 +181,12 @@ if [ ! -d "$ANDROID_DIR" ]; then
   echo "Run: cd client && npx cap add android"
   exit 1
 fi
+
+echo ""
+echo "Checking Java..."
+# shellcheck source=scripts/lib/java21.sh
+. "$JAVA_HELPER"
+require_java21
 
 if [ ! -f "$KEY_PROPERTIES" ]; then
   cat <<EOF
@@ -148,33 +226,9 @@ if grep -q "CHANGE_ME" "$KEY_PROPERTIES"; then
 fi
 
 echo ""
-echo "Checking Java..."
-if command -v /usr/libexec/java_home >/dev/null 2>&1; then
-  use_java_version() {
-    local requested_version="$1"
-    local java_home
-    java_home="$(/usr/libexec/java_home -v "$requested_version" 2>/dev/null)" || return 1
-
-    if ! "$java_home/bin/java" -version 2>&1 | grep -Eq "version \"${requested_version}([\".+_-]|$)"; then
-      return 1
-    fi
-
-    export JAVA_HOME="$java_home"
-    export PATH="$JAVA_HOME/bin:$PATH"
-    echo "Using Java $requested_version: $JAVA_HOME"
-  }
-
-  if use_java_version 21; then
-    :
-  elif use_java_version 17; then
-    :
-  else
-    echo "WARNING: Java 21/17 not found via /usr/libexec/java_home."
-    java -version || true
-  fi
-else
-  java -version || true
-fi
+echo "Checking Meta Android release configuration..."
+validate_meta_release_config
+echo "Meta Android release configuration is present."
 
 echo ""
 echo "Loading release AdMob environment..."
@@ -192,9 +246,27 @@ fi
 export REACT_APP_USE_ADMOB_TEST_ADS=false
 export_android_version_env
 
+if [ -n "${CURRENT_PLAY_VERSION_CODE:-}" ]; then
+  case "$CURRENT_PLAY_VERSION_CODE" in
+    ''|*[!0-9]*)
+      echo "ERROR: CURRENT_PLAY_VERSION_CODE must be a non-negative integer when supplied."
+      exit 1
+      ;;
+  esac
+
+  if [ "$REACT_APP_ANDROID_VERSION_CODE" -le "$CURRENT_PLAY_VERSION_CODE" ]; then
+    echo "ERROR: Android versionCode $REACT_APP_ANDROID_VERSION_CODE must be greater than CURRENT_PLAY_VERSION_CODE=$CURRENT_PLAY_VERSION_CODE."
+    exit 1
+  fi
+else
+  echo "WARNING: CURRENT_PLAY_VERSION_CODE is not set. Check Play Console and confirm versionCode $REACT_APP_ANDROID_VERSION_CODE is greater than the highest uploaded version."
+fi
+
 echo "REACT_APP_USE_ADMOB_TEST_ADS=$REACT_APP_USE_ADMOB_TEST_ADS"
 echo "REACT_APP_ANDROID_VERSION_CODE=$REACT_APP_ANDROID_VERSION_CODE"
 echo "REACT_APP_ANDROID_VERSION_NAME=$REACT_APP_ANDROID_VERSION_NAME"
+echo "META_AUTO_LOG_APP_EVENTS_ENABLED=$META_RELEASE_AUTO_LOG"
+echo "META_ADVERTISER_ID_COLLECTION_ENABLED=$META_RELEASE_AD_ID"
 echo "REACT_APP_ADMOB_ANDROID_BANNER_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_BANNER_ID:-}")"
 echo "REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_INTERSTITIAL_ID:-}")"
 echo "REACT_APP_ADMOB_ANDROID_NATIVE_ID=$(mask_admob_id "${REACT_APP_ADMOB_ANDROID_NATIVE_ID:-}")"
@@ -242,6 +314,11 @@ if [ ! -f "$APK_SOURCE" ]; then
 fi
 
 echo ""
+echo "Verifying Meta SDK release artifacts before copying..."
+cd "$ROOT_DIR"
+"$ROOT_DIR/scripts/verify-meta-sdk-android.sh" --variant release --skip-build
+
+echo ""
 echo "Copying release artifacts to dist..."
 mkdir -p "$OUTPUT_DIR"
 cp "$AAB_SOURCE" "$AAB_TARGET"
@@ -250,7 +327,12 @@ cp "$APK_SOURCE" "$APK_TARGET"
 echo ""
 echo "Verifying AAB signature..."
 if command -v jarsigner >/dev/null 2>&1; then
-  jarsigner -verify -certs "$AAB_TARGET"
+  if jarsigner -verify -certs "$AAB_TARGET" > "$AAB_SIGNATURE_LOG" 2>&1; then
+    echo "AAB signature verified with jarsigner. Details: $AAB_SIGNATURE_LOG"
+  else
+    cat "$AAB_SIGNATURE_LOG"
+    exit 1
+  fi
 else
   echo "WARNING: jarsigner not found; skipping AAB signature verification."
 fi
@@ -273,15 +355,26 @@ else
 fi
 
 if [ -n "$APK_SIGNER" ]; then
-  "$APK_SIGNER" verify --verbose "$APK_TARGET"
+  if "$APK_SIGNER" verify --verbose "$APK_TARGET" > "$APK_SIGNATURE_LOG" 2>&1; then
+    echo "APK signature verified with apksigner. Details: $APK_SIGNATURE_LOG"
+  else
+    cat "$APK_SIGNATURE_LOG"
+    exit 1
+  fi
 else
   echo "WARNING: apksigner not found; skipping APK signature verification."
+fi
+
+if [ "${RUN_RELEASE_DEVICE_QA:-false}" = "true" ]; then
+  echo ""
+  echo "Running release APK device QA..."
+  "$ROOT_DIR/scripts/test-android-release-apk.sh"
 fi
 
 cat <<EOF
 
 ========================================
- Release build complete
+Release build complete
 ========================================
 
 Google Play upload artifact:
@@ -300,5 +393,10 @@ Important:
 - Upload the AAB to Google Play. APK is for local QA only.
 - Do not click your own live AdMob ads.
 - Use debug builds/test devices for ad testing.
+- Package: $APP_ID
+- versionCode: $REACT_APP_ANDROID_VERSION_CODE
+- versionName: $REACT_APP_ANDROID_VERSION_NAME
+- Meta automatic app events enabled: $META_RELEASE_AUTO_LOG
+- Meta advertiser-ID collection enabled: $META_RELEASE_AD_ID
 
 EOF

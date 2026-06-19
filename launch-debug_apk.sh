@@ -10,7 +10,9 @@ SHARED_PRODUCT_URL="${SHARED_PRODUCT_URL:-}"
 REQUIRE_ADB="${REQUIRE_ADB:-false}"
 META_FRESH_INSTALL="${META_FRESH_INSTALL:-false}"
 META_LAUNCH_WAIT_SECONDS="${META_LAUNCH_WAIT_SECONDS:-10}"
-LOG_FILTER="GoodOne|GoodOneNativeAd|AdMob|MobileAds|GoogleMobileAds|Ads|NativeAd|AdLoader|AdView|MetaSdk|FacebookSDK|AppEvents|FacebookException|MOBILE_APP_INSTALL|fb_mobile_activate_app|SDK has not been initialized|Client token|ApplicationId|AndroidRuntime|FATAL EXCEPTION|Process ${APP_ID} has died|WebView|chromium|MediaCodec|OMX|ExoPlayer|Capacitor"
+META_REQUIRE_EVENT_EVIDENCE="${META_REQUIRE_EVENT_EVIDENCE:-false}"
+META_EVENT_WAIT_SECONDS="${META_EVENT_WAIT_SECONDS:-45}"
+LOG_FILTER="GoodOne|GoodOneNativeAd|AdMob|MobileAds|GoogleMobileAds|Ads|NativeAd|AdLoader|AdView|MetaSdk|FacebookSDK|AppEvents|FacebookException|MOBILE_APP_INSTALL|fb_mobile_activate_app|Flush completed|Result: Success|SDK has not been initialized|Client token|ApplicationId|AndroidRuntime|FATAL EXCEPTION|Process ${APP_ID} has died|UnknownHostException|SocketTimeoutException|SSLHandshakeException|GraphResponse|WebView|chromium|MediaCodec|OMX|ExoPlayer|Capacitor"
 
 fail() {
   echo "ERROR: $*" >&2
@@ -117,10 +119,60 @@ strict_log_checks() {
   fi
 }
 
+event_evidence_checks() {
+  if [ "$META_REQUIRE_EVENT_EVIDENCE" != "true" ]; then
+    return 0
+  fi
+
+  local deadline=$((SECONDS + META_EVENT_WAIT_SECONDS))
+  local saw_event="false"
+  local saw_flush="false"
+
+  while [ "$SECONDS" -le "$deadline" ]; do
+    capture_relevant_logcat "$APP_PID"
+
+    if grep -Eiq "fb_mobile_activate_app|MOBILE_APP_INSTALL" "$LOG_PATH"; then
+      saw_event="true"
+    fi
+
+    if grep -Eiq "Flush completed|Result: Success" "$LOG_PATH"; then
+      saw_flush="true"
+    fi
+
+    if [ "$saw_event" = "true" ] && [ "$saw_flush" = "true" ]; then
+      echo "Meta automatic event and flush-success evidence observed."
+      return 0
+    fi
+
+    if grep -Eiq "FacebookException|SDK has not been initialized|missing.*ApplicationId|invalid.*ApplicationId|ApplicationId.*(missing|invalid)|missing.*client token|client token.*(missing|required|invalid)" "$LOG_PATH"; then
+      fail "Meta configuration failure signature found while waiting for event evidence in $LOG_PATH."
+    fi
+
+    if grep -Eiq "UnknownHostException|SocketTimeoutException|SSLHandshakeException|GraphResponse.*(error|Exception|failed)|Failed.*AppEvents|network.*(error|failed)" "$LOG_PATH"; then
+      fail "Meta event evidence wait saw a network or endpoint failure signature in $LOG_PATH."
+    fi
+
+    sleep 2
+  done
+
+  if grep -Fq "FacebookSdk initialized=true" "$LOG_PATH"; then
+    if [ "$saw_event" != "true" ]; then
+      fail "Meta SDK initialized, but no automatic activation/install event evidence appeared within ${META_EVENT_WAIT_SECONDS}s."
+    fi
+    fail "Meta automatic event evidence appeared, but no flush-success evidence appeared within ${META_EVENT_WAIT_SECONDS}s."
+  fi
+
+  fail "Meta SDK initialization evidence was absent while waiting for event evidence."
+}
+
 validate_boolean_env REQUIRE_ADB "$REQUIRE_ADB"
 validate_boolean_env META_FRESH_INSTALL "$META_FRESH_INSTALL"
+validate_boolean_env META_REQUIRE_EVENT_EVIDENCE "$META_REQUIRE_EVENT_EVIDENCE"
 case "$META_LAUNCH_WAIT_SECONDS" in
   ''|*[!0-9]*) fail "META_LAUNCH_WAIT_SECONDS must be a positive integer." ;;
+esac
+case "$META_EVENT_WAIT_SECONDS" in
+  ''|*[!0-9]*) fail "META_EVENT_WAIT_SECONDS must be a positive integer." ;;
 esac
 
 echo "Building GoodOne debug APK..."
@@ -197,6 +249,7 @@ capture_relevant_logcat "$APP_PID"
 echo "Captured filtered logcat output at $LOG_PATH"
 
 strict_log_checks
+event_evidence_checks
 
 if adb_cmd exec-out screencap -p > "$SCREENSHOT_PATH"; then
   echo "Captured device screenshot at $SCREENSHOT_PATH"

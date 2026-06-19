@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLIENT_DIR="$ROOT_DIR/client"
 ANDROID_DIR="$CLIENT_DIR/android"
 OUTPUT_DIR="$ROOT_DIR/dist"
+JAVA_HELPER="$ROOT_DIR/scripts/lib/java21.sh"
 APK_SOURCE="$ANDROID_DIR/app/build/outputs/apk/debug/app-debug.apk"
 APK_TARGET="$OUTPUT_DIR/goodone-debug.apk"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org/}"
@@ -61,33 +62,9 @@ fi
 
 echo ""
 echo "Checking Java..."
-if command -v /usr/libexec/java_home >/dev/null 2>&1; then
-  use_java_version() {
-    local requested_version="$1"
-    local java_home
-    java_home="$(/usr/libexec/java_home -v "$requested_version" 2>/dev/null)" || return 1
-
-    if ! "$java_home/bin/java" -version 2>&1 | grep -Eq "version \"${requested_version}([\".+_-]|$)"; then
-      return 1
-    fi
-
-    export JAVA_HOME="$java_home"
-    export PATH="$JAVA_HOME/bin:$PATH"
-    echo "Using Java $requested_version: $JAVA_HOME"
-  }
-
-  if use_java_version 21; then
-    :
-  elif use_java_version 17; then
-    :
-  else
-    echo "WARNING: Java 21/17 not found via /usr/libexec/java_home."
-    echo "Continuing with current Java:"
-    java -version || true
-  fi
-else
-  java -version || true
-fi
+# shellcheck source=scripts/lib/java21.sh
+. "$JAVA_HELPER"
+require_java21
 
 echo ""
 echo "Installing frontend dependencies..."
