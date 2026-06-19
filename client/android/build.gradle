@@ -30,6 +30,12 @@ subprojects {
             languageVersion = org.gradle.jvm.toolchain.JavaLanguageVersion.of(21)
         }
     }
+
+    tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        javaLauncher = javaToolchains.launcherFor {
+            languageVersion = org.gradle.jvm.toolchain.JavaLanguageVersion.of(21)
+        }
+    }
 }
 
 task clean(type: Delete) {

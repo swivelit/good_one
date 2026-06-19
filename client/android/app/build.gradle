@@ -1,3 +1,5 @@
+import java.util.Locale
+
 apply plugin: 'com.android.application'
 
 def keystoreProperties = new Properties()
@@ -30,6 +32,104 @@ def requireReleaseSigningConfig = { ->
     }
 }
 
+def metaProperties = new Properties()
+def metaPropertiesFile = rootProject.file('meta.properties')
+def metaConfigHelp = """Missing or invalid Meta SDK Android configuration.
+Create client/android/meta.properties from client/android/meta.properties.example for local builds, or set these CI environment variables:
+  META_APP_ID
+  META_CLIENT_TOKEN
+  META_AUTO_LOG_APP_EVENTS_ENABLED
+  META_ADVERTISER_ID_COLLECTION_ENABLED
+Never place the server-side Meta secret value in this repository or mobile app."""
+
+if (metaPropertiesFile.exists()) {
+    metaProperties.load(new FileInputStream(metaPropertiesFile))
+}
+
+def requestedGradleTasks = gradle.startParameter.taskNames.collect { it.toLowerCase(Locale.ROOT) }
+def metaConfigRequiredForRequestedTasks = requestedGradleTasks.any { taskName ->
+    def leafTaskName = taskName.tokenize(':').last()
+    leafTaskName ==~ /.*(assemble|bundle|install|lint|test|connected|process|package|merge|compile|generate|verify|check|build).*/
+}
+
+def readMetaSetting = { String propertyName ->
+    def envValue = System.getenv(propertyName)
+    if (envValue != null) {
+        return [value: envValue.trim(), source: "environment variable ${propertyName}"]
+    }
+
+    if (metaProperties.containsKey(propertyName)) {
+        return [value: metaProperties.getProperty(propertyName, "").trim(), source: "client/android/meta.properties"]
+    }
+
+    return [value: null, source: null]
+}
+
+def requireMetaSetting = { String propertyName ->
+    def setting = readMetaSetting(propertyName)
+    if (setting.value == null) {
+        throw new GradleException("${metaConfigHelp}\nMissing required value: ${propertyName}")
+    }
+    return setting
+}
+
+def isPlaceholderMetaValue = { String value ->
+    def normalized = value.toLowerCase(Locale.ROOT)
+    normalized == "" ||
+        normalized.contains("replace") ||
+        normalized.contains("placeholder") ||
+        normalized.contains("example")
+}
+
+def parseRequiredMetaBoolean = { String propertyName ->
+    def setting = requireMetaSetting(propertyName)
+    def normalized = setting.value.toLowerCase(Locale.ROOT)
+    if (normalized != "true" && normalized != "false") {
+        throw new GradleException("${metaConfigHelp}\n${propertyName} from ${setting.source} must be exactly true or false.")
+    }
+    return normalized
+}
+
+def resolveMetaConfig = {
+    def appId = requireMetaSetting("META_APP_ID")
+    if (!(appId.value ==~ /\d+/) || appId.value == "123456789012345" || appId.value ==~ /0+/) {
+        throw new GradleException("${metaConfigHelp}\nMETA_APP_ID from ${appId.source} must be a numeric, non-placeholder Meta app ID.")
+    }
+
+    def clientToken = requireMetaSetting("META_CLIENT_TOKEN")
+    if (isPlaceholderMetaValue(clientToken.value)) {
+        throw new GradleException("${metaConfigHelp}\nMETA_CLIENT_TOKEN from ${clientToken.source} must be a non-empty, non-placeholder client token.")
+    }
+
+    return [
+        appId: appId.value,
+        clientToken: clientToken.value,
+        autoLogAppEventsEnabled: parseRequiredMetaBoolean("META_AUTO_LOG_APP_EVENTS_ENABLED"),
+        advertiserIdCollectionEnabled: parseRequiredMetaBoolean("META_ADVERTISER_ID_COLLECTION_ENABLED")
+    ]
+}
+
+def metaConfigError = null
+def resolvedMetaConfig = null
+try {
+    resolvedMetaConfig = resolveMetaConfig()
+} catch (GradleException error) {
+    metaConfigError = error
+}
+
+if (metaConfigRequiredForRequestedTasks && metaConfigError != null) {
+    throw metaConfigError
+}
+
+def androidStringResourceValue = { String value ->
+    value
+}
+
+def metaAppIdResourceValue = resolvedMetaConfig?.appId ?: "0"
+def metaClientTokenResourceValue = resolvedMetaConfig?.clientToken ?: ""
+def metaAutoLogResourceValue = resolvedMetaConfig?.autoLogAppEventsEnabled ?: "false"
+def metaAdvertiserIdResourceValue = resolvedMetaConfig?.advertiserIdCollectionEnabled ?: "false"
+
 android {
     namespace "com.goodone.marketplace"
     compileSdk rootProject.ext.compileSdkVersion
@@ -41,6 +141,10 @@ android {
         versionCode 11
         versionName "1.9"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        resValue "string", "facebook_app_id", androidStringResourceValue(metaAppIdResourceValue)
+        resValue "string", "facebook_client_token", androidStringResourceValue(metaClientTokenResourceValue)
+        resValue "bool", "facebook_auto_log_app_events_enabled", metaAutoLogResourceValue
+        resValue "bool", "facebook_advertiser_id_collection_enabled", metaAdvertiserIdResourceValue
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -78,6 +182,16 @@ tasks.matching { task -> task.name in ["assembleRelease", "bundleRelease"] }.con
     }
 }
 
+tasks.matching { task ->
+    task.name.toLowerCase(Locale.ROOT) ==~ /.*(assemble|bundle|install|lint|test|connected|process|package|merge|compile|generate|verify|check|build).*/
+}.configureEach {
+    doFirst {
+        if (metaConfigError != null) {
+            throw metaConfigError
+        }
+    }
+}
+
 repositories {
     flatDir{
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
@@ -91,6 +205,7 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation 'com.google.android.play:app-update:2.1.0'
     implementation "com.google.android.gms:play-services-ads:$playServicesAdsVersion"
+    implementation 'com.facebook.android:facebook-core:18.2.3'
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

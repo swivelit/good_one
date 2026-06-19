@@ -18,6 +18,26 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="chat_messages" />
 
+        <meta-data
+            android:name="com.facebook.sdk.ApplicationId"
+            android:value="@string/facebook_app_id" />
+
+        <meta-data
+            android:name="com.facebook.sdk.ClientToken"
+            android:value="@string/facebook_client_token" />
+
+        <meta-data
+            android:name="com.facebook.sdk.AutoInitEnabled"
+            android:value="true" />
+
+        <meta-data
+            android:name="com.facebook.sdk.AutoLogAppEventsEnabled"
+            android:value="@bool/facebook_auto_log_app_events_enabled" />
+
+        <meta-data
+            android:name="com.facebook.sdk.AdvertiserIDCollectionEnabled"
+            android:value="@bool/facebook_advertiser_id_collection_enabled" />
+
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
             android:name=".MainActivity"

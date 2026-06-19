@@ -37,6 +37,33 @@ adb_cmd() {
   adb -s "$DEVICE_ID" "$@"
 }
 
+read_meta_client_token() {
+  if [ -n "${META_CLIENT_TOKEN:-}" ]; then
+    printf '%s' "$META_CLIENT_TOKEN"
+    return 0
+  fi
+
+  if [ -f "client/android/meta.properties" ]; then
+    sed -nE 's/^[[:space:]]*META_CLIENT_TOKEN[[:space:]]*=[[:space:]]*(.*)[[:space:]]*$/\1/p' \
+      "client/android/meta.properties" | head -n 1
+  fi
+}
+
+redact_meta_client_token_file() {
+  local path="$1"
+  local token
+  local tmp_path
+
+  [ -f "$path" ] || return 0
+
+  token="$(read_meta_client_token || true)"
+  [ -n "$token" ] || return 0
+
+  tmp_path="${path}.redacted.$$"
+  awk -v token="$token" '{ gsub(token, "[REDACTED_META_CLIENT_TOKEN]"); print }' "$path" > "$tmp_path"
+  mv "$tmp_path" "$path"
+}
+
 parse_product_url() {
   node - "$1" <<'NODE'
 const rawUrl = process.argv[2];
@@ -463,6 +490,7 @@ adb_cmd shell am start -W \
   "$APP_ID"
 sleep 6
 adb_cmd shell logcat -d -v time > "$LOG_PATH" || true
+redact_meta_client_token_file "$LOG_PATH"
 
 PRODUCT_ROUTE="[GoodOne] Deep link opened: /products/$PRODUCT_ID"
 VENDOR_ROUTE="[GoodOne] Deep link opened: /vendors/$VENDOR_ID"
@@ -503,6 +531,7 @@ run_implicit_test() {
     | grep -E "mCurrentFocus|topResumedActivity|mFocusedApp" \
     | tee "$focus_path" || true
   adb_cmd shell logcat -d -v time > "$log_path" || true
+  redact_meta_client_token_file "$log_path"
 
   if ! grep -Fq "$APP_ID" "$focus_path"; then
     echo "ERROR: implicit $kind App Link did not focus $APP_ID."

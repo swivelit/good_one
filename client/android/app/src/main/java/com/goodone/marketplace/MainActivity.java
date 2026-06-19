@@ -1,5 +1,6 @@
 package com.goodone.marketplace;
 
+import android.content.pm.ApplicationInfo;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
@@ -25,6 +26,8 @@ import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.WebViewListener;
+import com.facebook.FacebookSdk;
+import com.facebook.LoggingBehavior;
 import com.goodone.marketplace.ads.NativeAdPlugin;
 import com.google.android.play.core.appupdate.AppUpdateInfo;
 import com.google.android.play.core.appupdate.AppUpdateManager;
@@ -37,6 +40,7 @@ import java.util.Locale;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "GoodOneMainActivity";
+    private static final String META_SDK_TAG = "MetaSdk";
     private static final String GOODONE_SAFE_AREA_CHANGE_EVENT = "goodone:native-safe-area-change";
     private static final int STATUS_BAR_COLOR = Color.rgb(17, 24, 39);
     private static final int APP_WINDOW_BACKGROUND_COLOR = Color.WHITE;
@@ -72,11 +76,35 @@ public class MainActivity extends BridgeActivity {
 
         super.onCreate(savedInstanceState);
 
+        configureMetaSdkDebugDiagnostics();
         configureEdgeToEdgeWindow();
         installSafeAreaInsetsBridge();
         installAdMobInsetGuard();
         appUpdateManager = AppUpdateManagerFactory.create(this);
         checkForImmediateUpdate();
+    }
+
+    private void configureMetaSdkDebugDiagnostics() {
+        if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) return;
+
+        try {
+            FacebookSdk.setIsDebugEnabled(true);
+            FacebookSdk.addLoggingBehavior(LoggingBehavior.APP_EVENTS);
+            Log.i(META_SDK_TAG, "Meta APP_EVENTS debug logging enabled=true");
+            Log.i(META_SDK_TAG, "FacebookSdk initialized=" + FacebookSdk.isInitialized());
+            Log.i(META_SDK_TAG, "Meta App ID configured=" + hasConfiguredMetaAppId());
+            Log.i(META_SDK_TAG, "Meta automatic app events enabled=" +
+                FacebookSdk.getAutoLogAppEventsEnabled());
+            Log.i(META_SDK_TAG, "Meta advertiser ID collection enabled=" +
+                FacebookSdk.getAdvertiserIDCollectionEnabled());
+        } catch (Exception error) {
+            Log.w(META_SDK_TAG, "Unable to read Meta SDK diagnostics", error);
+        }
+    }
+
+    private boolean hasConfiguredMetaAppId() {
+        String appId = getString(R.string.facebook_app_id).trim();
+        return appId.matches("\\d+") && !"123456789012345".equals(appId) && !appId.matches("0+");
     }
 
     @Override

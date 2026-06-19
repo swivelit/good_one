@@ -5,7 +5,7 @@ export default function PrivacyPolicy() {
   return (
     <main className="container py-5" style={{ maxWidth: 860 }}>
       <h1 className="fw-bold mb-3">Privacy Policy</h1>
-      <p className="text-muted">Last updated: May 10, 2026</p>
+      <p className="text-muted">Last updated: June 19, 2026</p>
 
       <p>
         GoodOne collects the information needed to run local marketplace
@@ -45,6 +45,19 @@ export default function PrivacyPolicy() {
         advertising and SDK policies to provide, measure, personalize, and limit
         ads. Debug builds use Google test ad units; release builds use GoodOne's
         production AdMob IDs.
+      </p>
+
+      <h5 className="fw-bold mt-4">Meta SDK And App Events</h5>
+      <p>
+        The GoodOne Android app uses the Meta SDK for app measurement,
+        attribution, and campaign effectiveness. Meta may receive app
+        interaction and activation information, device and app information,
+        diagnostics, network information, and identifiers where enabled and
+        legally permitted.
+      </p>
+      <p>
+        Advertiser-ID collection is controlled by app configuration and
+        applicable privacy choices.
       </p>
 
       <h5 className="fw-bold mt-4">Account Deletion</h5>
