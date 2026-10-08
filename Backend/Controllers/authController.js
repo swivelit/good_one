@@ -12,67 +12,6 @@ const OTP_EXPIRES_MS = 5 * 60 * 1000;
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
 
-const generateAdminToken = () =>
-  jwt.sign({ id: 'admin', role: 'admin' }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '7d',
-  });
-
-const isEmailLike = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-
-const getTrimmedEnv = (name) => {
-  const value = process.env[name];
-  return typeof value === 'string' ? value.trim() : '';
-};
-
-const getAdminCredentials = () => {
-  const adminUsername = getTrimmedEnv('ADMIN_USERNAME');
-  const adminPassword = getTrimmedEnv('ADMIN_PASSWORD');
-
-  if (adminUsername && adminPassword) {
-    return { username: adminUsername, password: adminPassword, source: 'ADMIN_*' };
-  }
-
-  const fallbackUsername = getTrimmedEnv('username');
-  const fallbackPassword = getTrimmedEnv('password');
-
-  if (fallbackUsername && fallbackPassword) {
-    console.warn(
-      'Admin login is using fallback lowercase username/password env vars. ' +
-      'Set ADMIN_USERNAME and ADMIN_PASSWORD in Render backend env.'
-    );
-    return { username: fallbackUsername, password: fallbackPassword, source: 'lowercase-fallback' };
-  }
-
-  return null;
-};
-
-const isAdminUsernameMatch = (enteredLogin, configuredUsername) => {
-  const entered = String(enteredLogin || '').trim();
-  const configured = String(configuredUsername || '').trim();
-
-  if (!entered || !configured) return false;
-
-  if (isEmailLike(entered) && isEmailLike(configured)) {
-    return entered.toLowerCase() === configured.toLowerCase();
-  }
-
-  return entered === configured;
-};
-
-const isAdminLoginMatch = ({ loginId, password }) => {
-  const credentials = getAdminCredentials();
-  if (!credentials) return null;
-
-  if (
-    isAdminUsernameMatch(loginId, credentials.username) &&
-    password === credentials.password
-  ) {
-    return credentials;
-  }
-
-  return null;
-};
-
 const isOtpExpired = (otp) =>
   !otp?.createdAt || Date.now() - new Date(otp.createdAt).getTime() > OTP_EXPIRES_MS;
 
@@ -289,7 +228,6 @@ exports.registerVendor = async (req, res) => {
     });
   }
 };
-
 exports.login = async (req, res) => {
   try {
     const { emailOrPhone, password } = req.body;
@@ -299,22 +237,6 @@ exports.login = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Email/phone and password are required',
-      });
-    }
-
-    const adminCredentials = isAdminLoginMatch({ loginId, password });
-
-    if (adminCredentials) {
-      return res.json({
-        success: true,
-        token: generateAdminToken(),
-        user: {
-          id: 'admin',
-          name: 'Administrator',
-          role: 'admin',
-          email: adminCredentials.username,
-        },
-        vendorProfile: null,
       });
     }
 
@@ -334,10 +256,19 @@ exports.login = async (req, res) => {
       });
     }
 
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is inactive',
+      });
+    }
+
     let vendorProfile = null;
 
     if (user.role === 'vendor') {
-      vendorProfile = await prisma.vendor.findUnique({ where: { userId: user.id } });
+      vendorProfile = await prisma.vendor.findUnique({
+        where: { userId: user.id },
+      });
     }
 
     res.json({
@@ -347,7 +278,10 @@ exports.login = async (req, res) => {
       vendorProfile: toCompat(vendorProfile),
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
@@ -456,9 +390,6 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-exports.getAdminCredentials = getAdminCredentials;
-exports.isAdminLoginMatch = isAdminLoginMatch;
 
 exports.getMe = async (req, res) => {
   try {
