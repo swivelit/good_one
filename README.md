@@ -207,11 +207,3 @@ Testing
 - Production must keep ENABLE_TEST_OTP=false and OTP_BYPASS_CODE blank/removed.
 - Production smoke command:
 CUSTOMER_EMAIL=<email> CUSTOMER_PASSWORD=<password> VENDOR_EMAIL=<email> VENDOR_PASSWORD=<password> API_BASE_URL=https://good-one-api.onrender.com/api FRONTEND_URL=https://good-one-jlcu.onrender.com npm run test:prod-smoke
-
-
-After replacing the file, run:
-
-```powershell
-git grep -n -E "ADMIN_USERNAME|ADMIN_PASSWORD"
-
-The old ADMIN_USERNAME references should be gone. ADMIN_PASSWORD may still appear because ADMIN_SEED_PASSWORD contains the text ADMIN_PASSWORD; that's expected.
