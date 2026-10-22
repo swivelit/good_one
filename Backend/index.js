@@ -105,8 +105,10 @@ app.use('/api/products', require('./Routes/productRouter'));
 app.use('/api/stats', require('./Routes/statsRoutes'));
 app.use('/api/chat', require('./Routes/chatRoutes'));
 app.use('/api/vendors', require('./Routes/vendorRoutes'));
+app.use('/api/coupons', require('./Routes/couponRoutes'));
 app.use('/api/reports', require('./Routes/reportRoutes'));
 app.use('/api/blocks', require('./Routes/blockRoutes'));
+app.use('/api/orders', require('./Routes/orderRoutes'));
 
 const connectedUsers = new Map();
 

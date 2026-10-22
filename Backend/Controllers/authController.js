@@ -585,3 +585,38 @@ exports.deleteMe = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.getAdminUsers = async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        role: { in: ['customer', 'vendor'] },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        avatar: true,
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    res.json({
+      success: true,
+      users: toCompat(users),
+    });
+  } catch (error) {
+    console.error('Failed to fetch admin users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch users.',
+    });
+  }
+};
+

@@ -105,6 +105,15 @@ const productDataFromBody = (body) => {
     data.originalPrice = Number(body.originalPrice);
   }
   if (body.tags !== undefined) data.tags = parseTags(body.tags);
+  if (body.isActive !== undefined) {
+  if (typeof body.isActive !== 'boolean') {
+    const error = new Error('isActive must be a boolean.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  data.isActive = body.isActive;
+}
 
   return data;
 };
@@ -117,6 +126,7 @@ const assertCleanProductFields = (body) => {
     condition: body.condition,
     location: body.location,
     tags: body.tags,
+    isActive: body.isActive,
   });
 };
 
@@ -244,12 +254,21 @@ exports.getProduct = async (req, res) => {
       include: productInclude,
     });
     if (!product) return res.status(404).json({ success: false, message: 'Product not found.' });
-
-    let productForResponse = product;
     const userId = req.user?.id;
-    const isOwnerView =
-      Boolean(userId) &&
-      (product.vendorUserId === userId || product.vendor?.userId === userId);
+const isOwnerView =
+  Boolean(userId) &&
+  (product.vendorUserId === userId || product.vendor?.userId === userId);
+
+if (
+  (!product.isActive || new Date(product.expiresAt) <= new Date()) &&
+  !isOwnerView
+) {
+  return res.status(404).json({
+    success: false,
+    message: 'Product not found.',
+  });
+}
+    let productForResponse = product;
     const isViewCountEligible = product.isActive && new Date(product.expiresAt) > new Date();
 
     if (isViewCountEligible && !isOwnerView) {
@@ -465,5 +484,24 @@ exports.getVendorProducts = async (req, res) => {
     res.json({ success: true, products: toCompat(products) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+exports.getAdminProducts = async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      include: productInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      success: true,
+      products: toCompat(products),
+    });
+  } catch (error) {
+    console.error('Admin product listing error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Unable to load product listings.',
+    });
   }
 };

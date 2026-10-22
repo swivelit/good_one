@@ -126,6 +126,11 @@ export const chatAPI = {
   sendMessage: (convId, data) => API.post(`/chat/${convId}/messages`, data),
 };
 
+export const couponAPI = {
+  validate: (data) => API.post('/coupons/validate', data),
+  getAvailable: () => API.get('/coupons/available'),
+};
+
 export const reportAPI = {
   create: (data) => API.post('/reports', data),
 };
