@@ -16,7 +16,11 @@ export const AuthProvider = ({ children }) => {
           setUser(data.user);
           setVendorProfile(data.vendorProfile);
         })
-        .catch(() => localStorage.removeItem('token'))
+        .catch(() => {
+  localStorage.removeItem('token');
+  setUser(null);
+  setVendorProfile(null);
+})
         .finally(() => setLoading(false));
     } else {
       setLoading(false);

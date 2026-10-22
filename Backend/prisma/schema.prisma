@@ -26,16 +26,19 @@ model User {
   updatedAt DateTime @updatedAt
 
   vendorProfile         Vendor?
-  products              Product[]      @relation("ProductVendorUser")
-  customerConversations Conversation[] @relation("ConversationCustomer")
-  vendorConversations   Conversation[] @relation("ConversationVendor")
+  products              Product[]          @relation("ProductVendorUser")
+  customerConversations Conversation[]     @relation("ConversationCustomer")
+  vendorConversations   Conversation[]     @relation("ConversationVendor")
   messages              Message[]
-  reportsMade           Report[]       @relation("ReportReporter")
-  reportsReceived       Report[]       @relation("ReportReportedUser")
-  blocksMade            Block[]        @relation("BlockBlocker")
-  blocksReceived        Block[]        @relation("BlockBlockedUser")
-  productViews          ProductView[]  @relation("ProductViewUser")
+  reportsMade           Report[]           @relation("ReportReporter")
+  reportsReceived       Report[]           @relation("ReportReportedUser")
+  blocksMade            Block[]            @relation("BlockBlocker")
+  blocksReceived        Block[]            @relation("BlockBlockedUser")
+  productViews          ProductView[]      @relation("ProductViewUser")
   pushTokens            PushToken[]
+  couponsCreated        Coupon[]           @relation("CouponCreator")
+  couponRedemptions     CouponRedemption[]
+  orders                Order[]
 }
 
 model Vendor {
@@ -63,27 +66,27 @@ model Vendor {
 }
 
 model Product {
-  id            String   @id @default(uuid()) @db.Uuid
-  vendorId      String   @db.Uuid
-  vendorUserId  String   @db.Uuid
-  title         String
-  description   String
-  price         Float
-  originalPrice Float?
-  category      String
-  condition     String   @default("good")
-  images        String[] @default([])
-  location      String?
-  isActive      Boolean  @default(true)
-  durationHours Int      @default(24)
-  expiresAt     DateTime @default(dbgenerated("(now() + interval '1 day')"))
+  id               String    @id @default(uuid()) @db.Uuid
+  vendorId         String    @db.Uuid
+  vendorUserId     String    @db.Uuid
+  title            String
+  description      String
+  price            Float
+  originalPrice    Float?
+  category         String
+  condition        String    @default("good")
+  images           String[]  @default([])
+  location         String?
+  isActive         Boolean   @default(true)
+  durationHours    Int       @default(24)
+  expiresAt        DateTime  @default(dbgenerated("(now() + interval '1 day')"))
   expiryNotifiedAt DateTime?
-  renewedAt     DateTime @default(now())
-  views         Int      @default(0)
-  renewalCount  Int      @default(0)
-  tags          String[] @default([])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  renewedAt        DateTime  @default(now())
+  views            Int       @default(0)
+  renewalCount     Int       @default(0)
+  tags             String[]  @default([])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   vendor        Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   vendorUser    User           @relation("ProductVendorUser", fields: [vendorUserId], references: [id], onDelete: Cascade)
@@ -215,3 +218,101 @@ model Block {
 
   @@unique([blockerId, blockedUserId])
 }
+
+enum CouponDiscountType {
+  percentage
+  fixed
+}
+
+model Coupon {
+  id            String             @id @default(uuid()) @db.Uuid
+  code          String             @unique
+  discountType  CouponDiscountType
+  discountValue Float
+  maxDiscount   Float?
+  minPurchase   Float              @default(0)
+  startsAt      DateTime           @default(now())
+  expiresAt     DateTime
+  usageLimit    Int?
+  isActive      Boolean            @default(true)
+  createdById   String             @db.Uuid
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  createdBy   User               @relation("CouponCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  redemptions CouponRedemption[]
+
+  @@index([isActive, expiresAt])
+  @@index([createdById])
+}
+
+model CouponRedemption {
+  id         String   @id @default(uuid()) @db.Uuid
+  couponId   String   @db.Uuid
+  userId     String   @db.Uuid
+  redeemedAt DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, userId])
+  @@index([userId])
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  completed
+  cancelled
+}
+
+enum PaymentMethod {
+  online
+  offline
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+model Order {
+  id              String        @id @default(uuid()) @db.Uuid
+  orderNumber     String        @unique @default(uuid())
+  customerId      String        @db.Uuid
+  subtotal        Float
+  discount        Float         @default(0)
+  total           Float
+  couponCode      String?
+  paymentMethod   PaymentMethod
+  paymentStatus   PaymentStatus @default(pending)
+  status          OrderStatus   @default(pending)
+  shippingAddress String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  customer User        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items    OrderItem[]
+
+  @@index([customerId, createdAt])
+  @@index([status, paymentStatus])
+}
+
+model OrderItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  orderId        String   @db.Uuid
+  productId      String   @db.Uuid
+  productTitle   String
+  unitPrice      Float
+  quantity       Int
+  lineTotal      Float
+  createdAt      DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([productId])
+}
+

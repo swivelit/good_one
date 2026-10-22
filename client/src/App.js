@@ -17,6 +17,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import RegisterCustomer from './pages/RegisterConstomerpage';
 import RegisterVendor from './pages/registervendor';
 import ProductDetail from './pages/productDetail';
+import CheckoutPage from './pages/CheckoutPage';
 import ChatPage from './pages/ChatPage';
 import VendorDashboard from './pages/VendorDashboard';
 import VendorProfile from './pages/VendorProfile';
@@ -106,6 +107,14 @@ function AppRoutes() {
         <Route path="/register/customer" element={<RegisterCustomer />} />
         <Route path="/register/vendor" element={<RegisterVendor />} />
         <Route path="/products/:id" element={<ProductDetail />} />
+<Route
+  path="/checkout"
+  element={
+    <PrivateRoute role="customer">
+      <CheckoutPage />
+    </PrivateRoute>
+  }
+/>
         <Route path="/vendors/:id" element={<VendorProfile />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfUse />} />

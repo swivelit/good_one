@@ -11,23 +11,42 @@ const getBearerToken = (req) => {
 
 exports.protect = async (req, res, next) => {
   const token = getBearerToken(req);
+
   if (!token) {
-    return res.status(401).json({ success: false, message: 'Not authorized, no token' });
+    return res.status(401).json({
+      success: false,
+      message: 'Not authorized, no token',
+    });
   }
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role === 'admin') {
-      req.user = { id: 'admin', role: 'admin', name: 'Administrator' };
-      return next();
-    }
-    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+    });
+
     if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
+      return res.status(401).json({
+        success: false,
+        message: 'User not found',
+      });
     }
+
+    if (!user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Account is inactive',
+      });
+    }
+
     req.user = sanitizeUser(user);
     next();
   } catch (error) {
-    return res.status(401).json({ success: false, message: 'Token invalid or expired' });
+    return res.status(401).json({
+      success: false,
+      message: 'Token invalid or expired',
+    });
   }
 };
 

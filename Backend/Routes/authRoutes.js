@@ -12,9 +12,10 @@ const {
   registerPushToken,
   deletePushToken,
   deleteMe,
+  getAdminUsers,
 } = require('../Controllers/authController');
 
-const { protect } = require('../middleware/auth');
+const { protect, adminOnly } = require('../middleware/auth');
 
 const multer = require('multer');
 const path = require('path');
@@ -53,7 +54,7 @@ router.post(
 router.post('/login', login);
 router.post('/forgot-password/send-otp', requestPasswordResetOtp);
 router.post('/forgot-password/reset', resetPassword);
-
+router.get('/admin/users', protect, adminOnly, getAdminUsers);
 router.get('/me', protect, getMe);
 router.put('/me', protect, updateMe);
 router.post('/push-token', protect, registerPushToken);

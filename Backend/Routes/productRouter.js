@@ -2,9 +2,9 @@ const express = require('express');
 const router = express.Router();
 const {
   getProducts, getProductLocations, getProduct, createProduct, updateProduct,
-  renewProduct, deleteProduct, getMyProducts, getVendorProducts,
+  renewProduct, deleteProduct, getMyProducts, getVendorProducts, getAdminProducts,
 } = require('../Controllers/productController');
-const { protect, optionalAuth, vendorOnly } = require('../middleware/auth');
+const { protect, optionalAuth, vendorOnly,adminOnly, } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const { uploadsDir } = require('../config/uploads');
@@ -25,6 +25,7 @@ const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 router.get('/', getProducts);
 router.get('/locations', getProductLocations);
 router.get('/my-products', protect, vendorOnly, getMyProducts);
+router.get('/admin/all', protect, adminOnly, getAdminProducts);
 router.get('/vendor/:vendorId', getVendorProducts);
 router.get('/:id', optionalAuth, getProduct);
 router.post('/', protect, vendorOnly, upload.array('images', 5), createProduct);
